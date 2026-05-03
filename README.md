@@ -248,3 +248,5 @@ MIT License — 자세한 내용은 [LICENSE](LICENSE) 참고.
 - [Formula Student Driverless Simulator](https://github.com/FS-Driverless/Formula-Student-Driverless-Simulator)
 - [AGENTS.md](AGENTS.md) — 본 프로젝트의 상세 컨벤션 / 아키텍처
 - [docs/SUBMISSION_GUIDE.md](docs/SUBMISSION_GUIDE.md) — 대회 제출 가이드
+
+<!-- LLM final probe 1777812018 -->
