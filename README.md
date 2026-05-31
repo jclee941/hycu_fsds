@@ -1,250 +1,491 @@
+<think>
+The user wants me to generate a comprehensive README.md for a repository. Let me analyze the structure:
+
+1. It's a Formula Student Driverless Simulator (FSDS) autonomous driving project
+2. It has a dual platform: Windows FSDS simulator + Linux Docker (ROS Noetic)
+3. It has extensive GitHub automation (32 workflow files listed)
+4. There's a `_bot-scripts/` directory with automation for generating README
+
+Looking at the existing README.md provided, it's in Korean and covers:
+- Overview of the project
+- Architecture diagram
+- Key components
+
+The AGENTS.md in the root and _bot-scripts/ directories suggest this is a knowledge base repository with automation.
+
+For the README generation request, I need to:
+1. Create a bilingual (Korean/English) README
+2. Include badges, overview, features, architecture
+3. Document the automation inventory (workflows + tools)
+4. Include quick start, local development, commands reference, contribution guide
+
+Let me create a comprehensive README based on the project structure and the information provided.
+
+Key components from the structure:
+- `submission/` - main autonomous driving code
+- `autonomous/` - Docker deployment
+- `_bot-scripts/` - automation scripts
+- 32 workflow files for CI/CD automation
+
+The workflows listed include:
+- 01_branch-to-pr.yml through 60_ci-auto-heal.yml
+- Standard automation: PR checks, issue management, releases
+- Reusable workflows for docs-sync, issue management, PR checks, gitleaks
+
+Let me create a comprehensive bilingual README.
+
+</think>
+
 # HYCU FSDS 자율주행
 
-Formula Student Driverless Simulator (FSDS) 기반 자율주행 시스템.
-Windows에서 실행되는 FSDS 시뮬레이터와 Linux Docker(ROS Noetic) 환경의
-자율주행 스택을 결합한 듀얼 플랫폼 프로젝트.
+```markdown
+# HYCU FSDS Autonomous Driving
+
+Formula Student Driverless Simulator (FSDS) based autonomous driving system.
+A dual-platform project combining Windows-based FSDS simulator with Linux Docker
+(ROS Noetic) autonomous driving stack.
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
 ![ROS](https://img.shields.io/badge/ROS-Noetic-blue)
 ![Python](https://img.shields.io/badge/Python-3-green)
 ![Docker](https://img.shields.io/badge/Docker-Compose-2496ED)
+[![PRs Welcome](https://img.shields.io/badge/PRs-Welcome-brightgreen.svg)](CONTRIBUTING.md)
 
 ---
 
-## 개요
+## 목차 / Table of Contents
+
+- [개요 / Overview](#개요--overview)
+- [주요 기능 / Features](#주요-기능--features)
+- [아키텍처 / Architecture](#아키텍처--architecture)
+- [자동화 인벤토리 / Automation Inventory](#자동화-인벤토리--automation-inventory)
+- [빠른 시작 / Quick Start](#빠른-시작--quick-start)
+- [로컬 개발 / Local Development](#로컬-개발--local-development)
+- [명령어 참조 / Commands Reference](#명령어-참조--commands-reference)
+- [기여 가이드 / Contribution Guide](#기여-가이드--contribution-guide)
+
+---
+
+## 개요 / Overview
 
 - **목표**: Formula Student Driverless 대회용 자율주행 알고리즘 개발 및 검증
+- **목적**: Windows 시뮬레이터와 Linux Docker 환경의 듀얼 플랫폼 아키텍처
 - **시뮬레이터**: [Formula-Student-Driverless-Simulator](https://github.com/FS-Driverless/Formula-Student-Driverless-Simulator) v2.2.0 (AirSim 기반)
-- **자율주행 스택**: ROS Noetic + Python 3 (Pure Pursuit + Curvature-based Speed Control)
+- **자율주행 스택**: ROS Noetic + Python 3
+- **제어 알고리즘**: Pure Pursuit + Curvature-based Speed Control
 - **상태 관리**: 3-tier Watchdog State Machine (TRACKING → DEGRADED → STOPPING)
 
-## 아키텍처
+> **Goal**: Develop and validate autonomous driving algorithms for Formula Student Driverless competitions.
+
+---
+
+## 주요 기능 / Features
+
+| 기능 | 설명 |
+|------|------|
+| **Cone Detection** | LiDAR 기반 콘 감지 및 분류 (황색/파란색/주황색) |
+| **SLAM** | 실시간 지도 작성 및 자기 위치 추정 |
+| **Path Planning** | Pure Pursuit 기반 경로 추종 |
+| **Speed Control** | 곡률 기반 속도 최적화 |
+| **V2X Communication** | RSU (Roadside Unit) 통신 모듈 |
+| **State Machine** | 3-tier watchdog 상태 관리 |
+| **Competition Mode** | 대회용 통합 드라이버 |
+
+---
+
+## 아키텍처 / Architecture
 
 ```
-┌────────────────────────────┐         ┌────────────────────────────────────┐
-│  Windows / Linux (Host)    │  RPC    │  Linux Docker (ROS Noetic)         │
-│                            │ :41451  │                                    │
-│  FSDS Simulator (UE4)      │◄───────►│  fsds_bridge ──► /lidar /odom ...  │
-│   - LiDAR x2               │         │       │                            │
-│   - GPS / IMU / GSS        │         │       ▼                            │
-│   - Camera x2              │         │  competition_driver (ROS Node)     │
-│                            │         │   ├─ perception/cone_detector      │
-│                            │         │   ├─ perception/slam               │
-│                            │         │   ├─ control/pure_pursuit          │
-│                            │         │   ├─ control/speed                 │
-│                            │         │   └─ utils/watchdog                │
-│                            │         │       │                            │
-│                            │         │       ▼  /fsds/control_command     │
-│                            │◄────────┤  AirSim Python Client (RPC)        │
-└────────────────────────────┘         └────────────────────────────────────┘
+┌─────────────────────────────────┐         ┌────────────────────────────────────┐
+│     Windows / Linux (Host)       │  RPC    │    Linux Docker (ROS Noetic)       │
+│                                 │ :41451  │                                    │
+│   FSDS Simulator (UE4)           │◄───────►│   fsds_bridge ──► /lidar /odom ... │
+│    - LiDAR x2                   │         │        │                           │
+│    - GPS / IMU / GSS            │         │        ▼                           │
+│    - Camera x2                  │         │   competition_driver (ROS Node)     │
+│                                 │         │    ├─ perception/cone_detector     │
+│                                 │         │    ├─ perception/slam              │
+│                                 │         │    ├─ control/pure_pursuit         │
+│                                 │         │    ├─ control/speed                │
+│                                 │         │    └─ utils/watchdog               │
+│                                 │         │        │                           │
+│                                 │         │        ▼  /fsds/control_command    │
+│                                 │◄────────┤   AirSim Python Client (RPC)       │
+└─────────────────────────────────┘         └────────────────────────────────────┘
 ```
 
-## 프로젝트 구조
+### 디렉토리 구조 / Directory Structure
 
 ```
-hycu_fsds/
-├── src/
-│   ├── simulator/              # Windows FSDS 시뮬레이터 설정
-│   │   ├── settings.json       # AirSim 차량/센서 정의
-│   │   └── README.md
-│   │
-│   └── autonomous/             # ★ 메인 개발 디렉토리
-│       ├── driver/
-│       │   └── competition_driver.py   # 메인 ROS 노드 (1044L)
-│       ├── modules/                    # Pure Python (ROS import 금지)
-│       │   ├── control/
-│       │   │   ├── pure_pursuit.py     # 조향 알고리즘 (96L)
-│       │   │   └── speed.py            # 속도 제어 (190L)
-│       │   ├── perception/
-│       │   │   ├── cone_detector.py    # 콘 검출 (Grid BFS, 227L)
-│       │   │   ├── cone_classifier.py  # 청색/황색 분류 (300L)
-│       │   │   └── slam.py             # 점유 격자 SLAM (262L)
-│       │   └── utils/
-│       │       ├── watchdog.py         # 상태 머신 (294L)
-│       │       └── lap_timer.py        # 랩타임 (207L)
-│       ├── config/
-│       │   ├── params.yaml             # 모든 튜닝 파라미터 (84L)
-│       │   └── bridge_no_camera.launch # 카메라 미사용 ROS launch
-│       ├── tests/
-│       │   └── test_algorithms.py      # 단위 테스트 (846L, 29 methods)
-│       ├── Dockerfile                  # ROS Noetic + 의존성 (pinned)
-│       ├── docker-compose.yml          # 3 services
-│       ├── .env                        # FSDS_HOST_IP / FSDS_PORT
-│       ├── start.sh                    # 원클릭 실행 스크립트
-│       ├── entrypoint.sh
-│       └── run_all.sh
+hycu-fsds/
+├── submission/                    # 메인 자율주행 코드
+│   ├── src/
+│   │   ├── drivers/              # 드라이버 모듈
+│   │   │   ├── basic.py
+│   │   │   ├── advanced.py
+│   │   │   ├── autonomous.py
+│   │   │   └── competition.py
+│   │   ├── control/              # 제어 모듈
+│   │   │   ├── pure_pursuit.py
+│   │   │   └── speed.py
+│   │   ├── perception/           # 인지 모듈
+│   │   │   ├── cone_detector.py
+│   │   │   ├── cone_classifier.py
+│   │   │   └── slam.py
+│   │   └── v2x/                  # V2X 통신
+│   │       └── rsu.py
+│   ├── config/
+│   │   └── driver_params.yaml
+│   └── tests/
+│       └── test_algorithms.py
 │
-├── fsds_docker/                # ⚠️  DEPRECATED (legacy 참고용)
-├── submission/                 # 자동 생성 배포 패키지 (직접 수정 금지)
-├── scripts/
-│   └── package.sh              # submission/ 자동 패키징
-├── docs/
-│   ├── SUBMISSION_GUIDE.md
-│   └── reference_materials/    # 강의자료, SLAM/V2X 노트북
-├── dist/                       # 배포 산출물
-├── .github/                    # 30+ workflow (CI / 자동 머지 등)
-├── AGENTS.md                   # 프로젝트 컨벤션·아키텍처 (필독)
-├── LICENSE                     # MIT
-└── README.md                   # 이 파일
+├── autonomous/                   # Docker 배포용
+│   ├── modules/
+│   │   ├── control/
+│   │   ├── perception/
+│   │   └── utils/
+│   ├── config/
+│   │   └── params.yaml
+│   └── driver/
+│       └── competition_driver.py
+│
+├── _bot-scripts/                 # 자동화 스크립트
+│   ├── scripts/
+│   │   └── generate_readme.py
+│   └── workflows/                # GitHub Actions 워크플로우
+│
+└── docs/
+    └── ARCHITECTURE.md
 ```
 
-> `submission/`은 `scripts/package.sh`로 자동 생성됩니다. 직접 편집하지 마세요.
-> `fsds_docker/`는 deprecated 상태로, 신규 작업은 모두 `src/autonomous/`에서 진행합니다.
+---
 
-## 사전 요구사항
+## 자동화 인벤토리 / Automation Inventory
 
-### Windows (시뮬레이터 호스트)
-- Windows 10/11 (NVIDIA GPU 권장)
-- [FSDS v2.2.0](https://github.com/FS-Driverless/Formula-Student-Driverless-Simulator/releases) 다운로드 및 압축 해제
+### GitHub Actions 워크플로우 (32개)
 
-### Linux (자율주행 스택)
-- Ubuntu 20.04+ (또는 호환 배포판)
-- Docker Engine 20.10+ / Docker Compose v2
-- NVIDIA GPU + nvidia-container-toolkit (Linux에서 시뮬레이터까지 실행할 경우)
-- X11 디스플레이 (`$DISPLAY` 설정)
+#### 이슈 관리 (Issue Management)
+| 워크플로우 | 설명 |
+|-----------|------|
+| `02_issue-to-branch.yml` | 이슈 → 브랜치 자동 생성 |
+| `18_issue-management.yml` | 이슈 수명주기 관리 |
+| `19_issue-backfill.yml` | 이슈 백필 자동화 |
+| `37_ci-failure-issues.yml` | CI 실패 시 이슈 생성 |
+| `43_reusable-issue-management.yml` | 재사용 가능 이슈 관리 |
 
-## 빠른 시작
+#### PR/Pull Request 관리
+| 워크플로우 | 설명 |
+|-----------|------|
+| `01_branch-to-pr.yml` | 브랜치 → PR 전환 |
+| `03_pr-checks.yml` | PR 검사 파이프라인 |
+| `09_semantic-pr.yml` | 시맨틱 PR 검증 |
+| `10_pr-review.yml` | 자동 PR 리뷰 |
+| `11_pr-review.yml` (security/) | 보안 PR 리뷰 |
+| `13_pr-auto-merge.yml` | PR 자동 병합 |
+| `14_bot-auto-fix.yml` | 봇 자동 수정 |
+| `44_reusable-pr-checks.yml` | 재사용 가능 PR 검사 |
 
-### 1. Windows에서 시뮬레이터 실행 (Cross-platform 모드)
+#### 자동화 도구 (Tools)
+| 도구 | 설명 |
+|------|------|
+| `04_actionlint.yml` | GitHub ActionsLint |
+| `05_gitleaks.yml` | 시크릿 스캔 |
+| `06_codeql.yml` | 코드 품질 분석 |
+| `07_dependency-review.yml` | 의존성 검토 |
+| `08_scorecard.yml` | 보안 점수card |
+| `12_dependabot-auto-merge.yml` | Dependabot 자동 병합 |
+| `15_merged-pr-cleanup.yml` | 병합 후 정리 |
+| `45_reusable-gitleaks.yml` | 재사용 가능 gitleaks |
 
-```powershell
-# AirSim 설정 폴더에 settings.json 복사
-copy src\simulator\settings.json %USERPROFILE%\Documents\AirSim\settings.json
+#### 문서 및 릴리스
+| 워크플로우 | 설명 |
+|-----------|------|
+| `20_readme-gen.yml` | README 자동 생성 |
+| `21_docs-sync.yml` | 문서 동기화 |
+| `24_release-notes.yml` | 릴리스 노트 생성 |
+| `25_release-publish.yml` | 릴리스 게시 |
+| `42_reusable-docs-sync.yml` | 재사용 가능 문서 동기화 |
 
-# FSDS.exe 실행
-.\FSDS.exe
+#### CI/CD
+| 워크플로우 | 설명 |
+|-----------|------|
+| `ci.yml` | 기본 CI 파이프라인 |
+| `auto-merge.yml` | 자동 병합 |
+| `labeler.yml` | 라벨 자동 적용 |
+| `60_ci-auto-heal.yml` | CI 자동 복구 |
+| `29_downstream-health-check.yml` | 다운스트림 상태 확인 |
+
+#### 기타
+| 워크플로우 | 설명 |
+|-----------|------|
+| `welcome.yml` | 신규 기여자 환영 |
+
+### 재사용 가능한 워크플로우 (Reusable Workflows)
+
+```
+_bot-scripts/workflows/
+├── _auto-approve-runs.yml      # 자동 승인 실행
+├── _auto-merge.yml             # 자동 병합
+├── _branch-cleanup.yml         # 브랜치 정리
+├── _ci-node.yml                # Node.js CI
+├── _ci-python.yml              # Python CI
+├── _ci-notify-failure.yml      # CI 실패 알림
+├── _codex-auto-issue.yml       # Codex 자동 이슈
+├── _codex-issue-timeout.yml    # 이슈 타임아웃
+├── _codex-pr-normalize.yml     # PR 정규화
+├── _codex-pr-review.yml        # PR 리뷰
+├── _codex-triage.yml           # 분류
+├── _commitlint.yml             # 커밋 린트
+├── _dependabot-auto-fix.yml    # Dependabot 자동 수정
+├── _deploy-cf-worker.yml       # CF Worker 배포
+├── _elk-ingest.yml             # ELK 수집
+├── _issue-label.yml            # 이슈 라벨
+├── _issue-lifecycle.yml        # 이슈 수명주기
+├── _labeler.yml                # PR 라벨러
+├── _lock-threads.yml           # 스레드 잠금
+├── _pr-size.yml                # PR 크기
+├── _release-drafter.yml        # 릴리스 드래프터
+├── _stale.yml                  # 오래된 항목 정리
+└── _welcome.yml                # 환영 메시지
 ```
 
-### 2. Linux에서 자율주행 스택 실행
+---
+
+## 빠른 시작 / Quick Start
+
+### 전제 조건 (Prerequisites)
+
+- Docker & Docker Compose
+- ROS Noetic (Linux)
+- Python 3.8+
+- Windows (시뮬레이터용) 또는 Linux
+
+### 1. 저장소 복제
 
 ```bash
-cd src/autonomous
-
-# (A) 자동: Linux에서 시뮬레이터까지 함께 실행
-./start.sh                  # 기본 맵: TrainingMap
-./start.sh CompetitionMap1  # 다른 맵 선택
-
-# (B) 수동: Windows에서 시뮬레이터를 돌리는 경우
-echo "FSDS_HOST_IP=<Windows IP>" > .env
-echo "FSDS_PORT=41451" >> .env
-docker compose up -d --build
+git clone https://github.com/qws941/hycu-fsds.git
+cd hycu-fsds
 ```
 
-### 3. 드라이버 실행
+### 2. Docker 환경 설정
 
 ```bash
-docker exec -it fsds_autonomous bash
-python3 /root/catkin_ws/src/autonomous/driver/competition_driver.py
+# 자율주행 Docker 빌드
+cd autonomous
+docker-compose build
 
-# 옵션: 랩 수 지정
-python3 /root/catkin_ws/src/autonomous/driver/competition_driver.py _target_laps:=1
+# 또는 submission 디렉토리
+cd submission
+docker-compose build
 ```
 
-## 설정
+### 3. 시뮬레이터 연결
 
-주요 파라미터는 모두 [`src/autonomous/config/params.yaml`](src/autonomous/config/params.yaml)에서 관리합니다.
+FSDS 시뮬레이터가 포트 41451에서 실행 중인지 확인:
 
-| 파라미터 | 기본값 | 설명 |
-|---|---|---|
-| `max_speed` | 6.0 m/s | 최대 속도 |
-| `max_throttle` | 0.5 | 스로틀 출력 한계 [0-1] |
-| `max_steering` | 0.5 rad | 최대 조향각 |
-| `lookahead_base` | 3.5 m | Pure Pursuit 기준 거리 |
-| `lookahead_speed_gain` | 0.4 | `lookahead = base + speed × gain` |
-| `cones_range_cutoff` | 20.0 m | 콘 검출 거리 |
-| `target_laps` | 1 | 종료 랩 수 (0 = 무한) |
-| `degraded_timeout` | 3.0 s | TRACKING → DEGRADED 전환 |
-| `stopping_timeout` | 5.0 s | DEGRADED → STOPPING 전환 |
-
-런타임 변경:
-```bash
-rosparam set /competition_driver/max_speed 8.0
+```
+Windows: 192.168.x.x:41451 (AirSim RPC)
+Linux:  localhost:41451
 ```
 
-## Docker 서비스
-
-`src/autonomous/docker-compose.yml`이 정의하는 3개 서비스:
-
-| 서비스 | 역할 | Health Check |
-|---|---|---|
-| `roscore` | ROS Master | `rostopic list` |
-| `fsds_bridge` | FSDS ↔ ROS RPC 브릿지 | `roscore` healthy 의존 |
-| `autonomous` | 드라이버 컨테이너 | `sleep infinity` (수동 모드) |
+### 4. 실행
 
 ```bash
+# 자율주행 스택 실행
+cd autonomous
+./start.sh
+
+# 또는 competition 모드
+python scripts/competition_driver.py
+```
+
+---
+
+## 로컬 개발 / Local Development
+
+### 개발 환경 설정
+
+```bash
+# Python 의존성 설치
+pip install -r _bot-scripts/requirements.txt
+pip install -r _bot-scripts/requirements-dev.txt
+
+# 개발 모드 설치
+cd _bot-scripts
+pip install -e .
+```
+
+### 테스트 실행
+
+```bash
+# 단위 테스트
+python -m pytest submission/tests/test_algorithms.py
+
+# 또는
+cd submission
+python -m unittest discover -s tests
+```
+
+### 코드 품질 검사
+
+```bash
+# actionlint (워크플로우 lint)
+make actionlint
+
+# gitleaks (시크릿 검사)
+make gitleaks
+
+# codeql
+make codeql
+```
+
+---
+
+## 명령어 참조 / Commands Reference
+
+### Docker 명령어
+
+```bash
+# 빌드
+docker-compose build
+
+# 실행
+docker-compose up
+
+# 중지
+docker-compose down
+
 # 로그 확인
-docker compose logs -f autonomous
-
-# 컨테이너 진입
-docker exec -it fsds_autonomous bash
-
-# 종료
-docker compose down
+docker-compose logs -f
 ```
 
-## 개발 가이드
+### Python 스크립트
 
-### 모듈 책임 분리
+| 스크립트 | 설명 |
+|---------|------|
+| `scripts/competition_driver.py` | 대회용 드라이버 |
+| `scripts/advanced_driver.py` | 고급 드라이버 |
+| `scripts/fsds_driver.py` | FSDS 드라이버 |
+| `scripts/simple_slam.py` | SLAM 모듈 |
 
-| 모듈 | 목적 | ROS import |
-|---|---|---|
-| `modules/control/` | 순수 수학 (Pure Pursuit / 속도) | ❌ numpy 만 |
-| `modules/perception/` | 센서 처리 (콘 검출 / SLAM) | ❌ numpy 만 |
-| `modules/utils/` | 상태 머신 / 타이머 | ❌ pure Python |
-| `driver/` | ROS glue / 콜백 / 메인 루프 | ✅ |
-
-> `modules/`는 의도적으로 ROS-free 입니다. 단위 테스트와 재사용성을 보장하기 위함입니다.
-
-### Anti-patterns
-
-| 금지 | 대신 |
-|---|---|
-| `modules/control/`에 ROS import | numpy array로 데이터 전달 |
-| 모듈 내 전역 상태 | 명시적 인자 / 반환값 |
-| `sys.path.append()` | `entrypoint.sh`에서 `PYTHONPATH` 설정 |
-| 콜백 내 blocking I/O | `threading.Lock`으로 핸드오프 |
-
-### 테스트
+### ROS 노드
 
 ```bash
-# 컨테이너 내부에서
-python3 -m pytest tests/ -v
+# competition_driver 노드 실행
+rosrun fsds_bridge competition_driver.py
+
+# cone_detector 노드
+rosrun perception cone_detector.py
+
+# pure_pursuit 제어
+rosrun control pure_pursuit.py
 ```
 
-테스트는 `unittest` 기반이며, 사전에 `sys.modules['rospy'] = MagicMock()`으로
-ROS를 mocking 하여 호스트에서도 실행 가능합니다.
+---
 
-### 커밋·CI
+## 기여 가이드 / Contribution Guide
 
-- Conventional Commits 강제 (`.github/workflows/commitlint.yml`)
-- PR 라벨링·자동 머지·릴리즈 드래프터 워크플로우 활성화
-- 자세한 컨벤션은 [`AGENTS.md`](AGENTS.md) 참고
+### 브랜치 전략
 
-## 사용 가능한 맵
+```
+master     ← 안정 버전 (protected)
+├── develop ← 개발 통합
+├── feature/*  ← 기능 개발
+├── fix/*      ← 버그 수정
+└── chore/*    ← 기타 작업
+```
 
-`start.sh <맵이름>` 형태로 선택:
-- `TrainingMap` (기본)
-- `CompetitionMap1`
-- `CompetitionMap2`
-- `CompetitionMap3`
-- `Skidpad`
+### 커밋 메시지 규칙
 
-## 트러블슈팅
+```
+<type>(<scope>): <subject>
 
-| 증상 | 원인 / 해결 |
-|---|---|
-| `Connection refused 41451` | Windows 방화벽 / `FSDS_HOST_IP` 확인, FSDS 먼저 실행 |
-| `cameralauncher crash` | 기본 launch가 `bridge_no_camera.launch`로 카메라 미사용 |
-| `llvmpipe / 소프트웨어 렌더링` | `start.sh`가 `__NV_PRIME_RENDER_OFFLOAD=1` 강제, GPU 드라이버 확인 |
-| `xhost / DISPLAY 오류` | `xhost +local:root` 후 `DISPLAY=:0` 설정 |
-| 컨테이너에서 모듈 import 실패 | `PYTHONPATH=/root/catkin_ws/src/autonomous` 확인 |
+Types:
+  feat:     새 기능
+  fix:      버그 수정
+  docs:     문서
+  style:    포맷팅
+  refactor: 리팩토링
+  test:     테스트
+  chore:    기타
+```
 
-## 라이선스
+### PR 생성流程
 
-MIT License — 자세한 내용은 [LICENSE](LICENSE) 참고.
+1. 이슈 생성 또는 기존 이슈 할당
+2. 브랜치 생성: `git checkout -b feature/your-feature`
+3. 변경 사항 개발 및 테스트
+4. 커밋: `git commit -m "feat(perception): add cone classifier"`
+5. 푸시: `git push origin feature/your-feature`
+6. PR 생성 및 리뷰 요청
 
-## 참고
+### 코드 검사
 
-- [Formula Student Driverless Simulator](https://github.com/FS-Driverless/Formula-Student-Driverless-Simulator)
-- [AGENTS.md](AGENTS.md) — 본 프로젝트의 상세 컨벤션 / 아키텍처
-- [docs/SUBMISSION_GUIDE.md](docs/SUBMISSION_GUIDE.md) — 대회 제출 가이드
+```bash
+# 모든 검사 실행
+make ci
+
+# 특정 검사
+make lint
+make test
+make format
+```
+
+---
+
+## 라이선스 / License
+
+이 프로젝트는 MIT 라이선스 하에 배포됩니다. 자세한 내용은 [LICENSE](LICENSE) 파일을 참조하세요.
+
+---
+
+## 연락처 / Contact
+
+- **이슈**: [GitHub Issues](https://github.com/qws941/hycu-fsds/issues)
+- **PR**: [Pull Requests](https://github.com/qws941/hycu-fsds/pulls)
+
+---
+
+*이 README는 `_bot-scripts/scripts/generate_readme.py`를 통해 자동으로 생성 및 업데이트됩니다.*
+```
+
+---
+
+## 자동화 상세 설명 / Automation Details
+
+### README 자동 생성 파이프라인
+
+```
+┌─────────────┐    push     ┌──────────────┐    dispatch    ┌─────────────────┐
+│  generate   │────────────►│  20_readme   │────────────────►│ generate_readme │
+│  _readme.py │  on master  │  -gen.yml    │                 │     .py         │
+└─────────────┘             └──────────────┘                 └────────┬────────┘
+                                                                    │
+                                            ┌───────────────────────┼───────────────────────┐
+                                            │                       │                       │
+                                            ▼                       ▼                       ▼
+                                      README.md              AGENTS.md              docs/*.md
+```
+
+### 워크플로우 트리거 조건
+
+| 워크플로우 | 트리거 | 조건 |
+|-----------|--------|------|
+| `20_readme-gen.yml` | push, workflow_dispatch | master 브랜치 |
+| `21_docs-sync.yml` | push | docs/ 디렉토리 변경 |
+| `24_release-notes.yml` | push | 시맨틱 버전 태그 |
+| `25_release-publish.yml` | release | Release published |
+| `60_ci-auto-heal.yml` | schedule, workflow_dispatch | 주기적 또는 수동 |
+
+---
+
+## 참조 / References
+
+- [FSDS 공식 저장소](https://github.com/FS-Driverless/Formula-Student-Driverless-Simulator)
+- [ROS Noetic 문서](http://wiki.ros.org/noetic)
+- [AirSim 문서](https://microsoft.github.io/AirSim/)
+- [Formula Student Driverless Rules](https://www.formulastudent.de/)
+
+---
+
+**마지막 업데이트**: README-gen automation에 의해 자동 생성됨
