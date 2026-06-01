@@ -1,6 +1,4 @@
-# HYCU FSDS Autonomous Driving
-
-# HYCU FSDS 자율주행
+# HYCU FSDS Autonomous Driving / HYCU FSDS 자율주행
 
 > Formula Student Driverless Simulator 기반 자율주행 시스템  
 > Formula Student Driverless Simulator (FSDS) Based Autonomous Driving System
@@ -9,6 +7,7 @@
 [![ROS: Noetic](https://img.shields.io/badge/ROS-Noetic-blue)](http://wiki.ros.org/noetic)
 [![Python: 3.8+](https://img.shields.io/badge/Python-3.8+-green)](https://www.python.org/)
 [![Docker](https://img.shields.io/badge/Docker-Ready-blue)](https://www.docker.com/)
+[![CI/CD](https://github.com/qws941/HYCU-FSDS/workflows/CI/badge.svg)](https://github.com/qws941/HYCU-FSDS/actions)
 
 ---
 
@@ -16,20 +15,36 @@
 
 - [개요 (Overview)](#개요-overview)
 - [주요 기능 (Key Features)](#주요-기능-key-features)
-- [시스템 아키텍처 (Architecture)](#시스템-아키텍처-architecture)
+- [시스템 아키텍처 (System Architecture)](#시스템-아키텍처-system-architecture)
 - [자동화 인벤토리 (Automation Inventory)](#자동화-인벤토리-automation-inventory)
 - [빠른 시작 (Quick Start)](#빠른-시작-quick-start)
 - [로컬 개발 (Local Development)](#로컬-개발-local-development)
 - [명령어 참고서 (Commands Reference)](#명령어-참고서-commands-reference)
-- [기여 가이드 (Contribution)](#기여-가이드-contribution)
+- [기여 가이드 (Contribution Guide)](#기여-가이드-contribution-guide)
 
 ---
 
 ## 개요 (Overview)
 
-본 프로젝트는 **Formula Student Driverless Simulator (FSDS)** 기반으로 개발된 자율주행 시스템입니다. Windows 환경의 시뮬레이터와 Linux (ROS Noetic) Docker 기반 자율주행 스택을 결합한 이중 플랫폼架构으로,cone 检测 (콘 감지), SLAM, 경로 계획 및 제어 기능을 통합합니다.
+본 프로젝트는 **Formula Student Driverless Simulator (FSDS)** 기반으로 개발된 자율주행 시스템입니다. Windows 환경의 시뮬레이터와 Linux (ROS Noetic) Docker 기반 자율주행 스택을 결합한 이중 플랫폼 아키텍처로, 콘 감지 (Cone Detection), SLAM, 경로 계획 및 제어 기능을 통합합니다.
 
 This project is an autonomous driving system based on the **Formula Student Driverless Simulator (FSDS)**. It combines a Windows-based simulator with a Linux (ROS Noetic) Docker-based autonomous driving stack, integrating cone detection, SLAM, path planning, and control functions.
+
+### 프로젝트 배경 (Project Background)
+
+본 프로젝트는 자율주행 알고리즘 연구 및 경진 대회 준비를 위해 구축되었으며, 다음 목표를 달성합니다:
+
+- FSDS 시뮬레이터 환경에서의 실시간 자율주행을 구현
+- ROS Noetic 기반의 모듈화된 자율주행 스택 제공
+- Cone Detection 및 SLAM을 통한 환경 인식 능력 확보
+- Pure Pursuit 및 속도 제어를 통한 경로 추종 성능 확보
+
+This project was established for autonomous driving algorithm research and competition preparation, achieving the following objectives:
+
+- Implement real-time autonomous driving in the FSDS simulator environment
+- Provide a modular autonomous driving stack based on ROS Noetic
+- Secure environmental perception through cone detection and SLAM
+- Ensure path-following performance through pure pursuit and speed control
 
 ---
 
@@ -49,150 +64,285 @@ This project is an autonomous driving system based on the **Formula Student Driv
 | 기능 (Feature) | 설명 (Description) |
 |---------------|-------------------|
 | **이중 플랫폼** | Windows FSDS + Linux Docker (ROS Noetic) |
-| **컨테이너화** | Docker & docker-compose 기반 일관된 개발 환경 |
-| **모듈식 설계** | Perception, Control, Drivers, V2X 분리 아키텍처 |
-| **자동화 파이프라인** | PR 리뷰, CI/CD, 이슈 관리, 문서 동기화 자동화 |
+| **컨테이너화** | Docker 기반 일관된 개발 환경 |
+| **모듈화 설계** | 독립적인 모듈 분리 (perception, control, drivers, v2x) |
+| **테스트 프레임워크** | pytest 기반 단위 테스트 |
+| **자동화 CI/CD** | GitHub Actions 기반 완전 자동화 |
 
 ---
 
-## 시스템 아키텍처 (Architecture)
+## 시스템 아키텍처 (System Architecture)
+
+### 전체架构 (Overall Architecture)
 
 ```mermaid
 flowchart TB
-    subgraph Simulator["🖥️ Windows FSDS Simulator"]
-        FSDS[Formula Student Driverless Simulator]
+    subgraph FSDS["FSDS Simulator (Windows)"]
+        A[Simulator Environment]
     end
 
-    subgraph DockerStack["🐳 Linux Docker Stack (ROS Noetic)"]
-        subgraph Perception["📡 Perception Layer"]
-            ConeDetector[Cone Detector<br/>cone_detector.py]
-            ConeClassifier[Cone Classifier<br/>cone_classifier.py]
-            SLAM[SLAM Module<br/>slam.py]
+    subgraph Docker["ROS Noetic Container (Linux)"]
+        subgraph Perception["Perception Module"]
+            B[cone_detector.py]
+            C[cone_classifier.py]
+            D[slam.py]
         end
 
-        subgraph Control["🎮 Control Layer"]
-            PurePursuit[Pure Pursuit Controller<br/>pure_pursuit.py]
-            SpeedControl[Speed Controller<br/>speed.py]
+        subgraph Control["Control Module"]
+            E[pure_pursuit.py]
+            F[speed.py]
         end
 
-        subgraph Drivers["🚗 Driver Layer"]
-            BasicDriver[Basic Driver<br/>basic.py]
-            AdvancedDriver[Advanced Driver<br/>advanced.py]
-            CompetitionDriver[Competition Driver<br/>competition.py]
-            AutonomousDriver[Autonomous Driver<br/>autonomous.py]
+        subgraph Drivers["Driver Module"]
+            G[basic.py]
+            H[advanced.py]
+            I[competition.py]
+            J[autonomous.py]
         end
 
-        subgraph V2X["📶 V2X Layer"]
-            RSU[RSU Communication<br/>rsu.py]
+        subgraph V2X["V2X Module"]
+            K[rsu.py]
         end
 
-        subgraph Utils["🔧 Utilities"]
-            LapTimer[Lap Timer<br/>lap_timer.py]
-            Watchdog[Watchdog<br/>watchdog.py]
+        subgraph Utils["Utilities"]
+            L[lap_timer.py]
+            M[watchdog.py]
         end
     end
 
-    subgraph CI["⚙️ GitHub Actions CI/CD"]
-        PRChecks[03_pr-checks.yml<br/>PR Validation]
-        PRReview[10_pr-review.yml<br/>AI PR Review]
-        DocSync[21_docs-sync.yml<br/>Docs Sync]
-        ReleaseNotes[24_release-notes.yml<br/>Release Notes]
-        Downstream[29_downstream-health-check.yml<br/>Downstream Check]
-        CIAutoHeal[60_ci-auto-heal.yml<br/>CI Auto-Heal]
+    subgraph External["External Services"]
+        N["&lt;homelab-host&gt;:8317<br/>(CLIProxy API)"]
+        O["&lt;homelab-elk&gt;<br/>(ELK Stack)"]
     end
 
-    FSDS -->|Sensor Data| Perception
-    Perception -->|Environment Model| Control
-    Control -->|Control Commands| Drivers
-    Drivers -->|Vehicle Commands| FSDS
-    SLAM -->|Localization| Control
-    RSU -->|V2X Data| Drivers
+    A -->|UDP/TCP| B
+    B --> C
+    C --> D
+    D --> E
+    E --> F
+    F --> G
+    G --> H
+    H --> I
+    I --> J
+    J --> K
+    L --> G
+    L --> H
+    L --> I
+    L --> J
+    M --> G
+    M --> H
+    M --> I
+    M --> J
+    I -->|Logging| O
+    J -->|Metrics| O
+    N -->|AI Review| J
+```
 
-    PRChecks -->|Quality Gate| PRReview
-    DocSync -->|Auto-sync| CI
-    CIAutoHeal -->|Health Monitor| CI
+### 모듈 의존성 (Module Dependencies)
+
+```mermaid
+flowchart LR
+    subgraph Input["Input Layer"]
+        sensor[Sensor Data]
+    end
+
+    subgraph感知层["Perception Layer"]
+        detection[Cone Detection]
+        classification[Cone Classification]
+        mapping[SLAM Mapping]
+    end
+
+    subgraph规划层["Planning Layer"]
+        planning[Path Planning]
+    end
+
+    subgraph控制层["Control Layer"]
+        pursuit[Pure Pursuit]
+        speed_ctrl[Speed Control]
+    end
+
+    subgraph执行层["Execution Layer"]
+        basic_driver[Basic Driver]
+        adv_driver[Advanced Driver]
+        comp_driver[Competition Driver]
+        auto_driver[Autonomous Driver]
+    end
+
+    sensor --> detection
+    detection --> classification
+    classification --> mapping
+    mapping --> planning
+    planning --> pursuit
+    pursuit --> speed_ctrl
+    speed_ctrl --> basic_driver
+    speed_ctrl --> adv_driver
+    speed_ctrl --> comp_driver
+    speed_ctrl --> auto_driver
+```
+
+### 디렉터리 구조 (Directory Structure)
+
+```text
+HYCU-FSDS/
+├── AGENTS.md                    # AI 에이전트 지침서
+├── CONTRIBUTING.md              # 기여 가이드
+├── LICENSE                      # MIT 라이선스
+├── OWNERS                       # 코드 소유자
+├── README.md                    # 본 문서
+├── in-memoria.db                # SQLite 데이터베이스
+│
+├── submission/                  # 제출용 완전한 자율주행 시스템
+│   ├── AGENTS.md
+│   ├── Dockerfile
+│   ├── README.md
+│   ├── dev.sh
+│   ├── docker-compose.yml
+│   ├── run.sh
+│   ├── docs/
+│   │   └── ARCHITECTURE.md
+│   ├── src/
+│   │   ├── __init__.py
+│   │   ├── utils/
+│   │   │   ├── __init__.py
+│   │   │   ├── lap_timer.py
+│   │   │   └── watchdog.py
+│   │   ├── drivers/
+│   │   │   ├── __init__.py
+│   │   │   ├── advanced.py
+│   │   │   ├── autonomous.py
+│   │   │   ├── basic.py
+│   │   │   └── competition.py
+│   │   ├── control/
+│   │   │   ├── __init__.py
+│   │   │   ├── pure_pursuit.py
+│   │   │   └── speed.py
+│   │   ├── perception/
+│   │   │   ├── __init__.py
+│   │   │   ├── cone_classifier.py
+│   │   │   ├── cone_detector.py
+│   │   │   └── slam.py
+│   │   └── v2x/
+│   │       ├── __init__.py
+│   │       └── rsu.py
+│   ├── config/
+│   │   └── driver_params.yaml
+│   ├── tests/
+│   │   └── test_algorithms.py
+│   ├── launch/
+│   │   └── competition.launch
+│   └── scripts/
+│       ├── advanced_driver.py
+│       ├── competition_driver.py
+│       ├── fsds_driver.py
+│       └── simple_slam.py
+│
+├── autonomous/                  # 자율주행 독립 실행 모듈
+│   ├── Dockerfile
+│   ├── docker-compose.yml
+│   ├── entrypoint.sh
+│   ├── run_all.sh
+│   ├── start.sh
+│   ├── modules/
+│   │   ├── __init__.py
+│   │   ├── utils/
+│   │   │   ├── __init__.py
+│   │   │   ├── lap_timer.py
+│   │   │   └── watchdog.py
+│   │   ├── control/
+│   │   │   ├── __init__.py
+│   │   │   ├── pure_pursuit.py
+│   │   │   └── speed.py
+│   │   ├── perception/
+│   │   │   ├── __init__.py
+│   │   │   ├── cone_classifier.py
+│   │   │   ├── cone_detector.py
+│   │   │   └── slam.py
+│   │   └── driver/
+│   │       └── competition_driver.py
+│   ├── config/
+│   │   └── params.yaml
+│   └── tests/
+│       └── test_algorithms.py
+│
+└── .github/                     # GitHub 설정 (workflows는 _bot-scripts/에서 관리)
 ```
 
 ---
 
 ## 자동화 인벤토리 (Automation Inventory)
 
-### GitHub Actions 워크플로우 (GitHub Actions Workflows)
+본 프로젝트는 GitHub Actions 기반의 comprehensive한 CI/CD 자동화를 포함합니다. 모든 workflow 파일은 `_bot-scripts/` 디렉터리에서 관리되며, `20_readme-gen.yml` workflow에 의해 자동으로 동기화됩니다.
 
-#### PR 및 코드 품질 (PR & Code Quality)
+All workflow files are managed in the `_bot-scripts/` directory and automatically synced to this repository by the `20_readme-gen.yml` workflow.
 
-| 워크플로우 파일 | 설명 | 주요 도구 |
-|---------------|------|----------|
-| `03_pr-checks.yml` | PR 기본 검증 (린트, 테스트) | actionlint, gitleaks, pytest |
-| `04_actionlint.yml` | 워크플로우 YAML 문법 검증 | actionlint |
-| `05_gitleaks.yml` |Secrets 스캐닝 | gitleaks |
-| `06_codeql.yml` | 정적 코드 분석 | GitHub CodeQL |
-| `07_dependency-review.yml` | 의존성 보안 검토 | dependency-review-action |
-| `08_scorecard.yml` | 보안 점수 평가 | scorecard-action |
-| `09_semantic-pr.yml` | Semantic PR 검증 | amannn/action-semantic-pull-request |
-| `10_pr-review.yml` | AI 기반 PR 리뷰 | qodo-ai/pr-agent |
-| `11_pr-review.yml` (security/) | 보안 이슈 PR 리뷰 | qodo-ai/pr-agent |
+### Workflow 파일 인벤토리 (Workflow File Inventory)
 
-#### 병합 및 자동화 (Merge & Automation)
+#### 1. Pull Request 및 Merge 자동화
 
-| 워크플로우 파일 | 설명 | 주요 도구 |
-|---------------|------|----------|
-| `12_dependabot-auto-merge.yml` | Dependabot 자동 병합 | mergify/hey-antonio-auto-merge |
-| `13_pr-auto-merge.yml` | PR 자동 병합 | mergify/hey-antonio-auto-merge |
-| `14_bot-auto-fix.yml` | 봇 수정 자동 적용 | qodo-ai/pr-agent |
-| `15_merged-pr-cleanup.yml` | 병합 후 브랜치 정리 | GitHub CLI |
-| `auto-merge.yml` | 범용 자동 병합 | mergify |
+| Workflow 파일 | 설명 |
+|--------------|------|
+| `01_branch-to-pr.yml` | 브랜치에서 PR로 자동 변환 |
+| `03_pr-checks.yml` | PR 필수 체크 (lint, test, build) |
+| `09_semantic-pr.yml` | Semantic PR 제목 검증 |
+| `10_pr-review.yml` | AI 기반 PR 리뷰 (qodo-ai/pr-agent) |
+| `13_pr-auto-merge.yml` | 자동 머지 트리거 |
+| `14_bot-auto-fix.yml` | Bot에 의한 자동 수정 |
+| `15_merged-pr-cleanup.yml` | 머지 후 브랜치 정리 |
+| `44_reusable-pr-checks.yml` | 재사용 가능한 PR 체크 |
+| `security/11_pr-review.yml` | 보안 리뷰 워크플로우 |
 
-#### 이슈 및 프로젝트 관리 (Issue & Project Management)
+#### 2. Issue 및 태스크 관리
 
-| 워크플로우 파일 | 설명 | 주요 도구 |
-|---------------|------|----------|
-| `02_issue-to-branch.yml` | 이슈 → 브랜치 자동 생성 | GitHub CLI |
-| `18_issue-management.yml` | 이슈 수명주기 관리 |机械化 (automation) |
-| `19_issue-backfill.yml` | 이슈 백필 태스크 |机械化 |
-| `37_ci-failure-issues.yml` | CI 실패 이슈 생성 | GitHub CLI |
-| `43_reusable-issue-management.yml` | 재사용 가능 이슈 관리 |机械化 (reusable workflow) |
+| Workflow 파일 | 설명 |
+|--------------|------|
+| `02_issue-to-branch.yml` | Issue에서 브랜치 자동 생성 |
+| `18_issue-management.yml` | Issue 수명 주기 관리 |
+| `19_issue-backfill.yml` | Issue 백필 자동화 |
+| `37_ci-failure-issues.yml` | CI 실패 시 Issue 자동 생성 |
+| `42_reusable-docs-sync.yml` | 문서 동기화 |
+| `43_reusable-issue-management.yml` | 재사용 가능한 Issue 관리 |
+| `91_issue-classification.yml` | Issue 분류 및 라벨링 |
 
-#### 문서 및 릴리스 (Documentation & Release)
+#### 3. 보안 및 품질
 
-| 워크플로우 파일 | 설명 | 주요 도구 |
-|---------------|------|----------|
-| `20_readme-gen.yml` | README 자동 생성 | minimax-m2.7 / gpt-5.5 via CLIProxyAPI |
-| `21_docs-sync.yml` | 문서 동기화 |机械化 |
-| `24_release-notes.yml` | Release Notes 생성 | release-drafter |
-| `25_release-publish.yml` | Release 게시 | gh release |
-| `42_reusable-docs-sync.yml` | 재사용 가능 문서 동기화 |机械化 (reusable workflow) |
+| Workflow 파일 | 설명 |
+|--------------|------|
+| `04_actionlint.yml` | GitHub Actions lint 검증 |
+| `05_gitleaks.yml` | secrets 및 credentials 스캔 |
+| `06_codeql.yml` | CodeQL 정적 분석 |
+| `07_dependency-review.yml` | 의존성 보안 리뷰 |
+| `08_scorecard.yml` | OpenSSF Scorecard 평가 |
+| `45_reusable-gitleaks.yml` | 재사용 가능한 gitleaks |
+| `60_ci-auto-heal.yml` | CI 자동 복구 |
 
-#### 브랜치 및 downstream 관리 (Branch & Downstream Management)
+#### 4. Release 및 배포
 
-| 워크플로우 파일 | 설명 | 주요 도구 |
-|---------------|------|----------|
-| `01_branch-to-pr.yml` | 브랜치 → PR 변환 | GitHub CLI |
-| `29_downstream-health-check.yml` | Downstream 저장소 상태 확인 |机械化 |
-| `45_reusable-gitleaks.yml` | 재사용 가능 gitleaks 스캐닝 | gitleaks (reusable workflow) |
-| `44_reusable-pr-checks.yml` | 재사용 가능 PR 검증 |机械化 (reusable workflow) |
+| Workflow 파일 | 설명 |
+|--------------|------|
+| `24_release-notes.yml` | 자동 Release 노트 생성 |
+| `25_release-publish.yml` | Release 게시 및 배포 |
+| `29_downstream-health-check.yml` | 다운스트림 리포지토리 상태 확인 |
 
-#### CI/CD 자동 복구 (CI/CD Auto-Healing)
+#### 5. 유지보수 자동화
 
-| 워크플로우 파일 | 설명 | 주요 도구 |
-|---------------|------|----------|
-| `60_ci-auto-heal.yml` | CI 실패 자동 복구 |机械化 |
+| Workflow 파일 | 설명 |
+|--------------|------|
+| `12_dependabot-auto-merge.yml` | Dependabot 자동 머지 |
+| `20_readme-gen.yml` | README 자동 생성 |
+| `21_docs-sync.yml` | 문서 동기화 |
+| `auto-merge.yml` | 일반 자동 머지 |
+| `ci.yml` | 주 CI 파이프라인 |
+| `labeler.yml` | PR 라벨 자동 분류 |
+| `welcome.yml` | 새로운 기여자 환영 |
 
-#### 기타 자동화 (Other Automation)
-
-| 워크플로우 파일 | 설명 | 주요 도구 |
-|---------------|------|----------|
-| `ci.yml` | 기본 CI 파이프라인 | GitHub Actions |
-| `labeler.yml` | PR 라벨 자동 분류 | actions/labeler |
-| `welcome.yml` | 신규 기여자 환영 메시지 | actions/first-interaction |
-
-### 외부 서비스 통합 (External Service Integration)
+### 외부 연동 서비스 (External Integration Services)
 
 | 서비스 | 엔드포인트 | 용도 |
-|--------|-----------|------|
-| **CLIProxyAPI** | `https://cliproxy.jclee.me/v1` | README 생성 (minimax-m2.7, gpt-5.5 fallback) |
-| **PR-Agent** | `https://bot.jclee.me` | AI 기반 PR 리뷰 및 자동 수정 |
-| **qodo-ai/pr-agent** | GitHub Marketplace | 코드 리뷰, 설명 생성, 태그 적용 |
+|--------|----------|------|
+| **CLIProxy API** | `https://cliproxy.jclee.me/v1` | AI 리뷰 및 코드 분석 |
+| **PR Agent** | `https://github.com/qodo-ai/pr-agent` | 자동 PR 리뷰 |
+| **ELK Stack** | `<homelab-elk>` | 로깅 및 메트릭 수집 |
+| **GitHub Bot** | `bot.jclee.me` | CI/CD webhook 처리 |
 
 ---
 
@@ -200,118 +350,146 @@ flowchart TB
 
 ### 전제 조건 (Prerequisites)
 
-- Docker & docker-compose
+- Docker 20.10+
+- Docker Compose 1.29+
 - Python 3.8+
 - ROS Noetic (Linux 환경)
-- Windows (FSDS 시뮬레이터용)
+- Git
 
-### Docker 환경 실행 (Running with Docker)
+### 1. 저장소 복제 (Clone Repository)
 
 ```bash
-# 전체 스택 실행 (competition mode)
-cd submission
-docker-compose up --build
-
-# 개발 모드로 실행
-docker-compose -f submission/docker-compose.yml up --build
+git clone https://github.com/qws941/HYCU-FSDS.git
+cd HYCU-FSDS
 ```
 
-### 단일 모듈 실행 (Running Individual Modules)
+### 2. Docker 기반 실행 (Run with Docker)
+
+#### 전체 자율주행 스택 실행
 
 ```bash
-# Competition driver 실행
-python submission/scripts/competition_driver.py
+cd submission
+docker-compose up --build
+```
 
-# Advanced driver 실행
-python submission/scripts/advanced_driver.py
+#### 독립형 자율주행 모듈 실행
+
+```bash
+cd autonomous
+docker-compose up --build
+```
+
+### 3. 직접 실행 (Direct Run)
+
+#### Bash 스크립트 사용
+
+```bash
+# 제출용 시스템 실행
+./submission/run.sh
+
+# 개발 모드 실행
+./submission/dev.sh
+```
+
+#### Python 스크립트 직접 실행
+
+```bash
+# Competition Driver 실행
+python3 submission/scripts/competition_driver.py
+
+# Advanced Driver 실행
+python3 submission/scripts/advanced_driver.py
+
+# FSDS Driver 실행
+python3 submission/scripts/fsds_driver.py
 
 # Simple SLAM 실행
-python submission/scripts/simple_slam.py
+python3 submission/scripts/simple_slam.py
+```
+
+### 4. 로컬 ROS 환경 설정 (Local ROS Setup)
+
+```bash
+# ROS Noetic 설치 (Ubuntu 20.04)
+sudo sh -c 'echo "deb http://packages.ros.org/ros/ubuntu focal main" > /etc/apt/sources.list.d/ros-latest.list'
+sudo apt-key adv --keyserver 'hkp://keyserver.ubuntu.com:80' --recv-key C1CF6E31E6BADE8868B172C4D1D87BFCD1C8FD6C
+sudo apt update
+sudo apt install ros-noetic-ros-base
+
+# 소스 디렉토리에 모듈 경로 추가
+export PYTHONPATH=$PYTHONPATH:/path/to/HYCU-FSDS/submission/src
 ```
 
 ---
 
 ## 로컬 개발 (Local Development)
 
-### 프로젝트 구조 (Project Structure)
-
-```
-hycu-fsds/
-├── README.md                     # 본 문서
-├── AGENTS.md                     # 자율주행 에이전트 설명
-├── CONTRIBUTING.md               # 기여 가이드
-├── LICENSE                       # MIT 라이선스
-├── OWNERS                        # 프로젝트 소유자
-├── in-memoria.db                 # 인메모리 데이터베이스
-├── submission/                   # 제출용 자율주행 코드
-│   ├── src/
-│   │   ├── perception/           # 인식 모듈 (cone detection, SLAM)
-│   │   │   ├── cone_detector.py
-│   │   │   ├── cone_classifier.py
-│   │   │   └── slam.py
-│   │   ├── control/              # 제어 모듈 (pure pursuit, speed)
-│   │   │   ├── pure_pursuit.py
-│   │   │   └── speed.py
-│   │   ├── drivers/               # 드라이버 모듈
-│   │   │   ├── basic.py
-│   │   │   ├── advanced.py
-│   │   │   ├── competition.py
-│   │   │   └── autonomous.py
-│   │   ├── v2x/                   # V2X 통신 모듈
-│   │   │   └── rsu.py
-│   │   └── utils/                 # 유틸리티
-│   │       ├── lap_timer.py
-│   │       └── watchdog.py
-│   ├── config/
-│   │   └── driver_params.yaml     # 드라이버 파라미터
-│   ├── scripts/
-│   │   ├── competition_driver.py
-│   │   ├── advanced_driver.py
-│   │   ├── fsds_driver.py
-│   │   └── simple_slam.py
-│   ├── tests/
-│   │   └── test_algorithms.py
-│   ├── docs/
-│   │   └── ARCHITECTURE.md        # 상세 아키텍처 문서
-│   ├── Dockerfile
-│   ├── docker-compose.yml
-│   ├── run.sh
-│   └── dev.sh
-├── autonomous/                   # 자율주행 독립 실행 환경
-│   ├── modules/
-│   │   ├── perception/
-│   │   ├── control/
-│   │   └── utils/
-│   ├── config/
-│   │   └── params.yaml
-│   ├── driver/
-│   │   └── competition_driver.py
-│   ├── tests/
-│   ├── Dockerfile
-│   ├── docker-compose.yml
-│   ├── entrypoint.sh
-│   ├── start.sh
-│   └── run_all.sh
-└── .github/
-    └── workflows/                # GitHub Actions 워크플로우 (32개)
-```
-
 ### 개발 환경 설정 (Development Environment Setup)
 
+#### 1. 의존성 설치 (Install Dependencies)
+
 ```bash
-# 저장소 클론
-git clone <repository-url>
-cd hycu-fsds
-
 # Python 의존성 설치
-pip install -r requirements.txt  # if available
+pip install -r requirements.txt
 
-# Docker 컨테이너 빌드
-cd submission
-docker-compose build
+# 개발용 의존성 설치
+pip install -r requirements-dev.txt
+```
 
-# ROS 환경 설정 (Linux)
-source /opt/ros/noetic/setup.bash
+#### 2. 환경 변수 설정 (Environment Variables)
+
+```bash
+# .env 파일 생성
+cat > .env << 'EOF'
+ROS_MASTER_URI=http://localhost:11311
+FSDS_HOST=localhost
+FSDS_PORT=5555
+CLIPROXY_API=https://cliproxy.jclee.me/v1
+EOF
+
+# 환경 변수 로드
+source .env
+```
+
+#### 3. 테스트 실행 (Run Tests)
+
+```bash
+# 모든 테스트 실행
+pytest submission/tests/test_algorithms.py -v
+
+# 특정 테스트 실행
+pytest submission/tests/test_algorithms.py -v -k test_pure_pursuit
+
+# 커버리지 포함 테스트
+pytest submission/tests/test_algorithms.py --cov=src --cov-report=html
+```
+
+### 코드 스타일 가이드 (Code Style Guide)
+
+```bash
+# Python lint 체크
+python3 -m pylint submission/src/
+
+# 포맷팅
+python3 -m black submission/src/
+
+# 타입 체크
+python3 -m mypy submission/src/
+```
+
+### 디버깅 (Debugging)
+
+#### Docker 컨테이너 내부에서 디버깅
+
+```bash
+# 컨테이너 접속
+docker exec -it hycu-fsds-submission bash
+
+# 프로세스 확인
+ps aux | grep python
+
+# 로그 확인
+tail -f /var/log/supervisor/*.log
 ```
 
 ---
@@ -320,139 +498,117 @@ source /opt/ros/noetic/setup.bash
 
 ### Docker 명령어 (Docker Commands)
 
-```bash
-# 전체 자율주행 스택 실행
-docker-compose up
+| 명령어 | 설명 |
+|--------|------|
+| `docker-compose -f submission/docker-compose.yml up --build` | 제출 시스템 빌드 및 실행 |
+| `docker-compose -f autonomous/docker-compose.yml up --build` | 자율주행 모듈 빌드 및 실행 |
+| `docker-compose -f submission/docker-compose.yml down` | 제출 시스템 중지 |
+| `docker-compose -f autonomous/docker-compose.yml down` | 자율주행 모듈 중지 |
+| `docker logs -f <container_name>` | 컨테이너 로그 확인 |
 
-# 개발 환경 실행 (파일 변경 감시)
-docker-compose -f submission/docker-compose.yml up
+### Python 스크립트 명령어 (Python Script Commands)
 
-# 단일 서비스 실행
-docker-compose up perception
+| 명령어 | 설명 |
+|--------|------|
+| `python3 submission/scripts/competition_driver.py` | 경진 대회용 Driver 실행 |
+| `python3 submission/scripts/advanced_driver.py` | 고급 Driver 실행 |
+| `python3 submission/scripts/fsds_driver.py` | FSDS 연결 Driver 실행 |
+| `python3 submission/scripts/simple_slam.py` | Simple SLAM 실행 |
 
-# 컨테이너 정리
-docker-compose down -v
+### GitHub Actions 워크플로우 트리거 (GitHub Actions Workflow Triggers)
 
-# 로그 확인
-docker-compose logs -f competition_driver
-```
+| Event | Workflow 파일 | 설명 |
+|-------|---------------|------|
+| `push` | `03_pr-checks.yml`, `05_gitleaks.yml`, `20_readme-gen.yml` | Push 시 체크 |
+| `pull_request` | `03_pr-checks.yml`, `10_pr-review.yml`, `13_pr-auto-merge.yml` | PR 시 체크 및 리뷰 |
+| `issueopened` | `02_issue-to-branch.yml`, `18_issue-management.yml` | Issue 자동处理 |
+| `schedule` | `08_scorecard.yml`, `12_dependabot-auto-merge.yml` | 주기적 실행 |
+| `workflow_dispatch` | `21_docs-sync.yml`, `42_reusable-docs-sync.yml` |手動 실행 |
 
-### Python 스크립트 (Python Scripts)
-
-```bash
-# Competition driver 실행
-python submission/scripts/competition_driver.py
-
-# Advanced driver 실행
-python submission/scripts/advanced_driver.py
-
-# FSDS driver 실행
-python submission/scripts/fsds_driver.py
-
-# Simple SLAM 실행
-python submission/scripts/simple_slam.py
-
-# 알고리즘 테스트 실행
-pytest submission/tests/test_algorithms.py
-```
-
-### ROS 명령어 (ROS Commands)
+### 일반적인 개발 명령어 (Common Development Commands)
 
 ```bash
-# Launch 파일 실행
-roslaunch submission competition.launch
+# Git 브랜치 생성
+git checkout -b feature/my-feature
 
-# 노드 실행 (개별)
-rosrun hycu_fsds competition_driver.py
+# 변경 사항 커밋
+git add .
+git commit -m "feat: add new feature"
 
-# 토픽 확인
-rostopic list
-rostopic echo /cone_detections
+# 원격에 푸시
+git push origin feature/my-feature
+
+# PR 생성
+gh pr create --title "feat: add new feature" --body "Description"
 ```
 
 ---
 
-## 기여 가이드 (Contribution)
+## 기여 가이드 (Contribution Guide)
 
-### 브랜치 전략 (Branch Strategy)
+### 기여 방법 (How to Contribute)
 
-```text
-master (보호 브랜치)
-├── feature/*      # 기능 개발
-├── fix/*          # 버그 수정
-├── docs/*         # 문서 업데이트
-├── refactor/*     # 코드 리팩토링
-└── automation/*   # 자동화 개선
-```
+1. **Fork** 저장소를 생성합니다
+2. **Feature 브랜치**를 생성합니다: `git checkout -b feature/amazing-feature`
+3. 변경 사항을 **Commit**합니다: `git commit -m 'feat: add amazing feature'`
+4. **Push**합니다: `git push origin feature/amazing-feature`
+5. **Pull Request**를 생성합니다
 
-### 워크플로우 (Workflow)
-
-1. **이슈 생성** (`02_issue-to-branch.yml` 참고)
-   - Bug, Feature, Documentation 유형 선택
-
-2. **브랜치 생성** (`01_branch-to-pr.yml` 참고)
-   - 자동 브랜치 생성 활용 가능
-
-3. **PR 작성** (`03_pr-checks.yml` 참고)
-   - 모든 CI 체크 통과 필요
-
-4. **AI 리뷰** (`10_pr-review.yml` 참고)
-   - qodo-ai/pr-agent가 자동 리뷰 수행
-
-5. **병합** (`13_pr-auto-merge.yml` 참고)
-   - 자동 병합 또는 수동 병합
-
-### 커밋 메시지 규칙 (Commit Message Rules)
+### 커밋 메시지 규칙 (Commit Message Convention)
 
 ```
-<type>(<scope>): <subject>
-
-Types: feat, fix, docs, style, refactor, test, chore
-Scopes: perception, control, drivers, v2x, ci, etc.
-
-Example:
-feat(perception): add cone detection with YOLOv8 integration
-fix(control): resolve pure pursuit corner case oscillation
-docs(architecture): update system architecture diagram
+feat: 새로운 기능 추가
+fix: 버그 수정
+docs: 문서 변경
+style: 코드 스타일 변경 (기능 변경 없음)
+refactor: 코드 리팩토링
+test: 테스트 관련 변경
+chore: 빌드 프로세스 또는 보조 도구 변경
 ```
 
-### 코드 품질 표준 (Code Quality Standards)
+### 코드 리뷰 프로세스 (Code Review Process)
 
-| 체크 항목 | 도구 | 설정 파일 |
-|----------|------|----------|
-| Python 린트 | flake8, pylint | `pyproject.toml` |
-| YAML 검증 | actionlint | `.actionlint.yml` |
-|Secrets 스캐닝 | gitleaks | `gitleaks.toml` |
-| 코드 분석 | CodeQL | `.github/workflows/06_codeql.yml` |
-| 의존성 검토 | dependency-review-action | `.github/workflows/07_dependency-review.yml` |
+1. PR 생성 후 자동화된 체크가 실행됩니다 (`03_pr-checks.yml`)
+2. AI 기반 코드 리뷰가 수행됩니다 (`10_pr-review.yml` - qodo-ai/pr-agent)
+3. 리뷰어가 코드를 검토합니다
+4. 모든 체크가 통과하면 자동 머지됩니다 (`13_pr-auto-merge.yml`)
 
-### 문서화 표준 (Documentation Standards)
+### 버그 리포트 및 기능 요청 (Bug Reports and Feature Requests)
 
-- 모든 모듈은 docstring 필수
-- PUBLIC 함수/클래스는 타입 힌트 포함
-- README 자동 생성 (`20_readme-gen.yml`) 활용
-- architecture 문서는 `submission/docs/ARCHITECTURE.md` 참조
+버그 리포트나 기능 요청은 [GitHub Issues](https://github.com/qws941/HYCU-FSDS/issues)를 통해 제출해주세요. 다음과 같은 정보를 포함하면 좋습니다:
+
+- 명확한 설명
+- 재현 단계
+- 예상 결과와 실제 결과
+- 환경 정보 (OS, Python 버전, Docker 버전 등)
+
+### 문서화 (Documentation)
+
+문서 업데이트는 다음 우선순위로 진행됩니다:
+
+1. 코드 내 주석 (Inline comments)
+2. `submission/docs/ARCHITECTURE.md` 업데이트
+3. `README.md` 업데이트
+4. `AGENTS.md` 업데이트 (AI 에이전트용)
 
 ---
 
 ## 라이선스 (License)
 
-MIT License - 자세한 내용은 [LICENSE](LICENSE) 파일 참조
+이 프로젝트는 MIT 라이선스 하에 공개됩니다. 자세한 내용은 [LICENSE](LICENSE) 파일을 참조하세요.
+
+This project is licensed under the MIT License. See [LICENSE](LICENSE) for details.
 
 ---
 
-## 소유자 (Owners)
+## 연락처 (Contact)
 
-프로젝트 소유자는 [OWNERS](OWNERS) 파일 참조
-
----
-
-## 추가 자료 (Additional Resources)
-
-- [Formula Student Driverless Simulator](https://www.formulastudent.de/) (외부 링크)
-- [ROS Noetic Documentation](http://wiki.ros.org/noetic) (외부 링크)
-- [qodo-ai/pr-agent](https://github.com/qodo-ai/pr-agent) (외부 링크)
+- **Repository**: [https://github.com/qws941/HYCU-FSDS](https://github.com/qws941/HYCU-FSDS)
+- **Issues**: [https://github.com/qws941/HYCU-FSDS/issues](https://github.com/qws941/HYCU-FSDS/issues)
+- **CI/CD Automation**: `_bot-scripts/` 디렉터리参照
 
 ---
 
-*본 문서는 `20_readme-gen.yml` 워크플로우에 의해 자동으로 생성 및 업데이트됩니다.*
+*본 README는 `20_readme-gen.yml` workflow에 의해 자동으로 생성 및 업데이트됩니다.*
+
+*This README is automatically generated and updated by the `20_readme-gen.yml` workflow.*
