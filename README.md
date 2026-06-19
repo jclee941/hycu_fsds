@@ -160,7 +160,7 @@ flowchart TB
 |----------------|------|--------|
 | `02_issue-to-branch.yml` | 이슈 태그 시 브랜치 자동 생성 | issues |
 | `15_merged-pr-cleanup.yml` | 병합 후 브랜치 정리 | pull_request (merge) |
-| `18_issue-management.yml` | 이슈 자동 라벨링/관리 | 이슈 |
+| `jclee-bot App issue-management` | 이슈 자동 라벨링/관리 | 이슈 |
 
 #### 릴리스 및 배포 (Release & Deploy)
 
@@ -184,7 +184,7 @@ flowchart TB
 | 워크플로우 파일 | 설명 |
 |----------------|------|
 | `42_reusable-docs-sync.yml` | 문서 동기화 템플릿 |
-| `43_reusable-issue-management.yml` | 이슈 관리 템플릿 |
+| `jclee-bot App issue-management` | 이슈 관리 템플릿 |
 | `44_reusable-pr-checks.yml` | PR 검사 템플릿 |
 | `45_reusable-gitleaks.yml` | Gitleaks 스캔 템플릿 |
 
