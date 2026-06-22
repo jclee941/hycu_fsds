@@ -1,329 +1,366 @@
 # HYCU FSDS Autonomous Driving / HYCU FSDS 자율주행
 
-> Formula Student Driverless Simulator 기반 자율주행 시스템
-> Autonomous driving stack for the Formula Student Driverless Simulator (FSDS)
+> Formula Student Driverless Simulator(FSDS) 기반 자율주행 시스템
+> Autonomous driving stack targeting the Formula Student Driverless Simulator (FSDS)
 
 ![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)
 ![ROS: Noetic](https://img.shields.io/badge/ROS-Noetic-blue)
 ![Python: 3.8+](https://img.shields.io/badge/Python-3.8+-green)
 ![Docker: Ready](https://img.shields.io/badge/Docker-Ready-blue)
-![GitHub Actions: 14 workflows](https://img.shields.io/badge/GitHub%20Actions-14%20workflows-informational)
-![PR Review: qodo-ai/pr-agent](https://img.shields.io/badge/PR%20Review-qodo--ai%2Fpr--agent-blue)
 ![Simulator: FSDS](https://img.shields.io/badge/Simulator-FSDS-orange)
 ![Automator: jclee-bot](https://img.shields.io/badge/Automator-jclee--bot-purple)
+![PR Review: qodo-ai/pr-agent](https://img.shields.io/badge/PR%20Review-qodo--ai%2Fpr--agent-blue)
+![LLM Gateway: CLIProxyAPI](https://img.shields.io/badge/LLM%20Gateway-CLIProxyAPI-informational)
 
 ---
 
 ## Overview / 개요
 
 **EN**
-HYCU FSDS Autonomous Driving is an autonomous driving project targeting the Formula Student Driverless Simulator (FSDS). It ships Dockerized ROS Noetic components covering the full perception → planning → control → safety loop, plus simulator integration, V2X roadside unit support, lap timing, race recording, and a competition-grade packaging pipeline. The repository is split into two parallel execution paths so the same algorithms can be iterated locally and re-built as a frozen runtime for evaluation.
+HYCU FSDS Autonomous Driving is a Dockerized ROS Noetic stack for the Formula Student Driverless Simulator (FSDS). It closes the full perception → planning → control → safety loop, ships V2X roadside-unit support, lap timing, race recording, and a competition-grade packaging pipeline. The repository is intentionally split into two parallel execution paths so the same algorithms can be iterated locally and re-built as a frozen runtime for evaluation without code drift.
 
 **KR**
-HYCU FSDS Autonomous Driving은 Formula Student Driverless Simulator(FSDS) 환경을 위한 자율주행 프로젝트입니다. 인지(perception) → 계획(planning) → 제어(control) → 안전(safety) 루프를 ROS Noetic 기반 Docker 컴포넌트로 제공하며, 시뮬레이터 연동, V2X RSU 지원, 랩 타이밍, 레이스 레코딩, 대회 제출용 패키징 파이프라인을 함께 제공합니다. 저장소는 동일한 알고리즘을 로컬에서 반복 개발하고, 평가용 동결 런타임(frozen runtime)으로 재빌드할 수 있도록 두 개의 병렬 실행 경로로 구성됩니다.
+HYCU FSDS Autonomous Driving은 Formula Student Driverless Simulator(FSDS) 환경을 위한 Docker 기반 ROS Noetic 자율주행 스택입니다. 인지(perception) → 계획(planning) → 제어(control) → 안전(safety) 루프를 완결하며, V2X RSU 지원, 랩 타이밍, 레이스 레코딩, 대회 제출용 패키징 파이프라인을 함께 제공합니다. 저장소는 동일한 알고리즘을 로컬에서 반복 개발하고 평가용 동결 런타임(frozen runtime)으로 재빌드할 수 있도록 두 개의 병렬 실행 경로로 의도적으로 분리되어 있습니다.
 
-### Two execution paths / 두 가지 실행 경로
+### Two Execution Paths / 두 가지 실행 경로
 
-1. **`src/autonomous/`** — Development-oriented stack for algorithm iteration / 알고리즘 반복 개발용 자율주행 스택.
-2. **`submission/`** — Frozen runtime stack for competition submission or evaluation / 대회 제출 또는 평가를 위한 동결 실행 스택.
+1. **`src/autonomous/`** — Development-oriented stack for algorithm iteration on `bridge_no_camera.launch` and `params.yaml`. / 알고리즘 반복 개발용 자율주행 스택 (`bridge_no_camera.launch`, `params.yaml` 기반).
+2. **`submission/`** — Frozen runtime stack for competition submission, re-uses identical module names under `src/` but is rebuilt via `run.sh` / `dev.sh` and shipped as a Docker image. / 대회 제출 또는 평가를 위한 동결 실행 스택(`run.sh` / `dev.sh`로 재빌드되어 Docker 이미지로 출하).
 
-The `submission/` stack re-uses the same perception, control, and utility modules from `src/`, and adds launch orchestration (`launch/competition.launch`), four driver modes (`basic`, `advanced`, `autonomous`, `competition`), V2X roadside unit support (`v2x/rsu.py`), and submission packaging helpers. This guarantees that the algorithm under iteration is byte-identical to the algorithm under evaluation.
+The two paths share the same conceptual module layout (`perception/`, `control/`, `utils/`, `v2x/`, `driver/`) but are versioned independently so the frozen runtime cannot accidentally inherit in-progress development modules.
 
 ---
 
 ## Features / 주요 기능
 
 ### Perception / 인지
-- **Cone detection & classification** — color-aware cone detector plus a neural / classical classifier pipeline (`src/autonomous/modules/perception/`, mirrored in `submission/src/perception/`).
-- **SLAM** — simultaneous localization and mapping for track understanding and pose estimation.
+- Convolutional cone detection (`perception/cone_detector.py`) — color + shape candidates from FSDS camera frames.
+- Cone classifier (`perception/cone_classifier.py`) — refines detector output into blue / yellow / orange / large classes.
+- Visual SLAM (`perception/slam.py`) — feature-based localization against the FSDS track map.
 
-### Control & Planning / 제어 및 계획
-- **Pure pursuit** — geometric path-following controller.
-- **Speed planner** — curvature-aware target speed generator.
-- **Lap timer** — split/lap timing module for race recording and analysis.
+### Control / 제어
+- Pure pursuit path tracker (`control/pure_pursuit.py`) — geometric steering against a smoothed centerline.
+- Speed governor (`control/speed.py`) — curvature-aware target velocity with accel / decel clamps.
 
-### Safety / 안전
-- **Watchdog** — health and timeout monitor covering the autonomy stack.
-- **Driver wrappers** — `basic` / `advanced` / `autonomous` / `competition` modes with progressive risk envelopes.
+### Safety & Timing / 안전 및 타이밍
+- Watchdog (`utils/watchdog.py`) — heartbeat supervision of every perception and control node; emergency stop on missed beats.
+- Lap timer (`utils/lap_timer.py`) — sector splits and best-lap tracking, exposed as a ROS topic.
 
-### Connectivity / 통신
-- **V2X / RSU** — roadside unit communication via `submission/src/v2x/rsu.py`, observable to the homelab observability stack at `<homelab-elk>` (placeholder, no hardcoded IPs).
+### V2X / 차량-인프라 통신
+- Roadside unit client (`v2x/rsu.py`) — receives SPaT / MAP messages from a simulated RSU for intersection logic.
 
-### Tooling / 도구
-- **Docker & docker-compose** — reproducible runtime for both stacks.
-- **Race harness** — `record_race.sh`, `run_all.sh`, and `scripts/start_race.py` for headless race recording and replay.
-- **Package script** — `scripts/package.sh` produces the frozen submission artifact.
-- **Tests** — `src/autonomous/tests/test_algorithms.py` covers core algorithms.
+### Driver Loop / 드라이버 루프
+- `driver/competition_driver.py` — top-level state machine: `WAIT → PREARM → DRIVE → FINISH`.
+- `scripts/start_race.py` — race launcher that arms the stack, runs the start light, and switches to `DRIVE`.
 
-### Automation / 자동화
-- **14 GitHub Actions workflows** orchestrating CI, PR review, auto-merge, release, and observability.
-- **qodo-ai/pr-agent** for non-mutating PR review feedback.
-- **jclee-bot** for all mutating repository automation (see [jclee-bot Automation Surfaces](#jclee-bot-automation-surfaces--jclee-bot-자동화-영역)).
-- **Self-learning store** — `in-memoria.db` at repository root for race telemetry and post-run learning.
+### Race Recording / 레이스 레코딩
+- `record_race.sh` captures rostopic + rosbag output for offline replay and judging.
+- `run_all.sh` chains build → launch → record → package into a single command.
+
+### Packaging / 패키징
+- `./scripts/package.sh` produces a self-contained submission tarball with the frozen `submission/` runtime.
 
 ---
 
 ## Architecture / 아키텍처
 
-The stack is layered into a simulator boundary, a ROS bridge, two parallel execution paths (development and frozen submission), and an external observability + LLM-assist sink. Perception, control, and utility modules are shared between both paths so dev iteration and frozen evaluation never diverge in algorithm.
+### High-level Data Flow / 상위 데이터 흐름
 
 ```mermaid
 flowchart TB
-    subgraph Sim [Simulator Boundary]
-        FSDS["FSDS Simulator"]
-    end
+  subgraph Triggers["Repository Triggers"]
+    ev["push / pull_request / issues / schedule<br/>(GitHub events)"]
+    owner["jclee-bot<br/>automation owner<br/>https://bot.jclee.me"]
+  end
 
-    subgraph Bridge [ROS Bridge Layer]
-        LAUNCH["launch/competition.launch<br/>bridge_no_camera.launch"]
-    end
+  subgraph Models["Model Routing"]
+    proxy["CLIProxyAPI<br/>https://cliproxy.jclee.me/v1<br/>(public endpoint)"]
+    primary["primary model: gpt-5.5"]
+    fallback["fallback model: minimax-m3"]
+  end
 
-    subgraph Dev [src/autonomous/ - Development Stack]
-        D_PERC["Perception<br/>cone_detector, cone_classifier, slam"]
-        D_CTRL["Control<br/>pure_pursuit, speed"]
-        D_UTIL["Utils<br/>watchdog, lap_timer"]
-        D_DRV["driver/competition_driver.py"]
-    end
+  subgraph Dev["src/autonomous/ development stack"]
+    dev_perc["perception/<br/>cone_detector, cone_classifier, slam"]
+    dev_ctrl["control/<br/>pure_pursuit, speed"]
+    dev_safe["safety/<br/>watchdog, lap_timer"]
+    dev_driver["driver/competition_driver.py<br/>scripts/start_race.py"]
+  end
 
-    subgraph Sub [submission/ - Frozen Runtime]
-        S_DRV["Drivers<br/>basic, advanced, autonomous, competition"]
-        S_PERC["Perception modules"]
-        S_CTRL["Control modules"]
-        S_V2X["v2x/rsu.py"]
-        S_LAUNCH["launch/competition.launch"]
-    end
+  subgraph Sub["submission/ frozen runtime"]
+    sub_perc["perception/ + v2x/rsu.py"]
+    sub_ctrl["control/ + drivers/advanced.py"]
+    sub_pack["launch/competition.launch<br/>run.sh + Dockerfile"]
+  end
 
-    subgraph Out [External]
-        RSU["V2X RSU Endpoint<br/>&lt;homelab-elk&gt;"]
-        OBS["Observability Sink<br/>&lt;homelab-host&gt;"]
-        MODEL["LLM Assist<br/>https://cliproxy.jclee.me/v1<br/>gpt-5.5 / minimax-m3"]
-    end
+  subgraph Sim["Simulation Loop"]
+    fsds["FSDS<br/>Formula Student Driverless Simulator"]
+  end
 
-    FSDS --> LAUNCH
-    LAUNCH --> D_PERC
-    D_PERC --> D_CTRL
-    D_CTRL --> D_DRV
-    D_UTIL -. monitors .-> D_DRV
-    D_DRV --> FSDS
+  subgraph Sink["Observability"]
+    elk["ELK ingest target<br/>&lt;homelab-elk&gt; placeholder<br/>(opaque log sink)"]
+    gw["&lt;homelab-host&gt;:8317 placeholder<br/>(local CLIProxyAPI instance)"]
+  end
 
-    S_LAUNCH --> S_DRV
-    S_DRV --> S_PERC
-    S_DRV --> S_CTRL
-    S_DRV --> S_V2X
-    S_V2X --> RSU
-    S_DRV --> OBS
-
-    OBS -. feeds .-> MODEL
+  ev --> owner
+  owner --> proxy
+  proxy --> primary
+  proxy -.fallback path.-> fallback
+  owner -->|iterate| Dev
+  owner -->|freeze and package| Sub
+  Dev <-->|bridge_no_camera.launch and params.yaml| fsds
+  Sub <-->|competition.launch| fsds
+  Dev --> elk
+  Sub --> elk
+  proxy -. local instance .- gw
 ```
 
-### Architecture notes / 아키텍처 노트
-- The dev stack lives in `src/autonomous/` and uses `entrypoint.sh` + `start.sh` for iterative bring-up.
-- The submission stack lives in `submission/` and exposes a competition-grade `run.sh` + `dev.sh` entry point pair.
-- Both stacks persist race telemetry to `in-memoria.db` at repository root for post-race analysis and self-learning.
-- No private IPs (RFC1918) or LXC container numbers are hardcoded; resolve them through homelab placeholder variables (`<homelab-host>`, `<homelab-elk>`) at deploy time.
-- LLM-assisted authoring flows through the public endpoint `https://cliproxy.jclee.me/v1` with `gpt-5.5` as the primary model and `minimax-m3` as the fallback. The bot control plane is reachable at `https://bot.jclee.me`.
+### Stack Layout / 스택 레이아웃
+
+```
+.
+├── AGENTS.md                 # Project knowledge base (this repo's home)
+├── CONTRIBUTING.md           # Contribution policy
+├── LICENSE                   # MIT
+├── OWNERS                    # Code owners for CODEOWNERS-driven review routing
+├── README.md                 # This document
+├── in-memoria.db             # Local SQLite cache for long-running run metadata
+├── src/
+│   ├── autonomous/           # Development iteration stack
+│   │   ├── AGENTS.md
+│   │   ├── Dockerfile
+│   │   ├── docker-compose.yml
+│   │   ├── entrypoint.sh
+│   │   ├── record_race.sh
+│   │   ├── run_all.sh
+│   │   ├── start.sh
+│   │   ├── config/
+│   │   │   ├── bridge_no_camera.launch
+│   │   │   └── params.yaml
+│   │   ├── driver/
+│   │   │   └── competition_driver.py
+│   │   ├── modules/
+│   │   │   ├── perception/   # cone_detector, cone_classifier, slam
+│   │   │   ├── control/      # pure_pursuit, speed
+│   │   │   └── utils/        # lap_timer, watchdog
+│   │   ├── scripts/
+│   │   │   └── start_race.py
+│   │   └── tests/
+│   │       └── test_algorithms.py
+│   └── simulator/
+│       ├── README.md
+│       └── settings.json
+├── scripts/
+│   └── package.sh            # Submission tarball builder
+├── docs/
+│   ├── SUBMISSION_GUIDE.md
+│   └── reference_materials/  # FSDS install notes, SLAM and V2X lecture notebooks
+└── submission/               # Frozen runtime stack
+    ├── AGENTS.md
+    ├── Dockerfile
+    ├── README.md
+    ├── dev.sh
+    ├── docker-compose.yml
+    ├── run.sh
+    ├── launch/
+    │   └── competition.launch
+    ├── src/
+    │   ├── drivers/          # basic, autonomous, advanced, competition
+    │   ├── perception/       # cone_detector, cone_classifier, slam
+    │   ├── v2x/              # rsu.py
+    │   ├── utils/            # lap_timer, watchdog
+    │   └── control/          # pure_pursuit, speed
+    └── autonomous/           # Submission-side autonomous mirror
+        ├── Dockerfile
+        ├── docker-compose.yml
+        ├── entrypoint.sh
+        ├── run_all.sh
+        ├── start.sh
+        ├── config/params.yaml
+        ├── driver/competition_driver.py
+        └── modules/perception/
+```
+
+> The two top-level `autonomous/` trees (`src/autonomous/` and `submission/autonomous/`) are intentionally separate so the frozen runtime stays reproducible while the development tree keeps moving.
 
 ---
 
 ## jclee-bot Automation Surfaces / jclee-bot 자동화 영역
 
 **EN**
-All mutating repository automation in this project is owned and operated by `jclee-bot`. Workflow files in `.github/workflows/` are the implementation triggers, not the source of truth — the source of truth is jclee-bot's automation contract described below. Non-mutating surfaces (PR review, CI checks) are delegated to specialized tools like `qodo-ai/pr-agent`.
+All mutating repository automation is owned by `jclee-bot` (reachable at `https://bot.jclee.me`). The bot is the source of truth; the GitHub workflow files under `.github/workflows/` are merely implementation triggers that fire the bot's automation. The automation surfaces are:
+
+- **Issue intake & branching** — new issues are triaged, labeled, and converted into working branches. Issue automation behavior is tagged `jclee-bot에의해자동화됨` so human reviewers can see at a glance which issues are bot-driven.
+- **Branch → PR** — working branches are automatically opened as pull requests with the correct base and reviewers resolved from `OWNERS`.
+- **PR review (general + security)** — general code review uses [qodo-ai/pr-agent](https://github.com/qodo-ai/pr-agent) as the suggestion engine; a separate security-focused review pass checks dependencies, secrets, and unsafe ROS message types.
+- **Dependabot auto-merge** — patch and minor Dependabot PRs that pass CI and review are auto-merged by jclee-bot.
+- **PR auto-merge** — PRs that pass the full gate (CI green, `qodo-ai/pr-agent` review non-blocking, approvals per `OWNERS`) are squash-merged.
+- **Bot auto-fix** — when review or CI surfaces a fixable issue, jclee-bot opens a follow-up PR against the same branch.
+- **Merged PR cleanup** — branches whose PRs are merged are deleted; stale remote refs are pruned.
+- **Issue backfill** — periodic scan of the repo for TODOs, `FIXME` comments, and crash logs that were never filed as issues, and opens them with a backfill label.
+- **Release notes & publish** — release notes are drafted from merged PRs and a release is published and tagged.
+- **Downstream health check** — pings downstream consumers (sim images, ELK ingest, etc.) and opens an issue if any consumer reports an error.
+- **CI failure issues** — when a CI run fails on `master` and is not retried successfully within a window, jclee-bot opens a labeled failure issue with the failing log attached.
 
 **KR**
-이 저장소의 모든 변경(mutating) 자동화는 `jclee-bot`이 소유하고 운영합니다. `.github/workflows/`의 워크플로우 파일은 구현용 트리거이며, 진실의 원천(Source of Truth)은 아래에 설명하는 jclee-bot의 자동화 계약입니다. 비변경(non-mutating) 자동화(PR 리뷰, CI 검사 등)는 `qodo-ai/pr-agent` 등 전문 도구에 위임됩니다.
+저장소의 모든 변형(mutating) 자동화는 `jclee-bot`이 소유합니다(엔드포인트: `https://bot.jclee.me`). 봇 자체가 단일 진실 공급원(Source of Truth)이며, `.github/workflows/` 안의 GitHub 워크플로우 파일들은 봇 자동화를 *발화시키는* 구현 트리거일 뿐입니다. 자동화 영역은 다음과 같이 구분됩니다.
 
-### Issue automation / 이슈 자동화
-- `jclee-bot에의해자동화됨` — When an issue is filed with the appropriate label or template, jclee-bot auto-creates a working branch and opens a draft PR linking back to the issue. This is the canonical **issue-to-branch** surface.
-- `jclee-bot에의해자동화됨` — Issue backfill reconciles orphaned issues against branches and PRs.
-- `jclee-bot에의해자동화됨` — CI failure issues are filed automatically by jclee-bot when CI fails on a protected branch.
+- **이슈 접수 및 브랜치 생성** — 신규 이슈를 분류·라벨링한 뒤 작업 브랜치로 변환합니다. 이슈 자동화 동작에는 `jclee-bot에의해자동화됨` 마커가 붙어, 어느 이슈가 봇에 의해 처리되고 있는지를 한눈에 식별할 수 있습니다.
+- **브랜치 → PR** — 작업 브랜치는 올바른 base 및 리뷰어(`OWNERS` 기준)와 함께 자동으로 PR로 열립니다.
+- **PR 리뷰(일반 + 보안)** — 일반 코드 리뷰는 [qodo-ai/pr-agent](https://github.com/qodo-ai/pr-agent)를 제안 엔진으로 사용하며, 별도의 보안 리뷰 패스가 의존성, 시크릿, 안전하지 않은 ROS 메시지 타입을 점검합니다.
+- **Dependabot 자동 머지** — CI와 리뷰를 통과한 Dependabot PR의 patch/minor 업데이트는 jclee-bot이 자동 머지합니다.
+- **PR 자동 머지** — 전체 게이트(CI 통과, `qodo-ai/pr-agent` 리뷰 비차단, `OWNERS` 승인)를 통과한 PR은 squash 머지됩니다.
+- **봇 자동 수정** — 리뷰나 CI가 수정 가능한 사안을 발견하면, jclee-bot이 동일 브랜치에 후속 PR을 엽니다.
+- **머지된 PR 정리** — PR이 머지된 브랜치는 삭제되고 원격 ref가 가지치기됩니다.
+- **이슈 백필** — 주기적으로 저장소를 스캔하여 이슈로 등록되지 않은 `TODO`/`FIXME` 주석과 크래시 로그를 발견하면 백필 라벨과 함께 이슈를 엽니다.
+- **릴리스 노트 및 퍼블리시** — 머지된 PR로부터 릴리스 노트가 초안 작성되며, 릴리스가 퍼블리시·태깅됩니다.
+- **다운스트림 헬스 체크** — 다운스트림 컨슈머(시뮬레이터 이미지, ELK 인제스트 등)에 헬스 체크를 보내고 오류가 보고되면 이슈를 엽니다.
+- **CI 실패 이슈** — `master`에서 CI가 실패한 후 일정 시간 내 재시도 성공이 없으면, jclee-bot이 실패 로그를 첨부한 라벨된 이슈를 엽니다.
 
-### PR automation / PR 자동화
-- jclee-bot auto-merges PRs that pass review and CI.
-- jclee-bot applies bot-driven fixes (lint, formatting, dependency bumps).
-- jclee-bot auto-merges Dependabot PRs once CI is green.
-- jclee-bot deletes merged head branches.
-- jclee-bot promotes branches to PRs through the branch-to-PR surface.
-
-### Release automation / 릴리스 자동화
-- jclee-bot drafts release notes from the merged change set.
-- jclee-bot publishes releases (versioning, artifacts, changelog).
-
-### Cross-repo health / 저장소 간 헬스 체크
-- jclee-bot performs a downstream health check against consumer repositories and opens issues when drift is detected.
-
-### Non-jclee-bot surfaces / jclee-bot 외 영역
-- **PR review** — feedback is generated by [`qodo-ai/pr-agent`](https://github.com/qodo-ai/pr-agent). This surface is non-mutating; it only posts review comments.
-- **Security PR review** — static security review on PRs; non-mutating.
-- **CI** — the base CI pipeline is owned by the project team and is not mutating.
+> Workflow files exist only to dispatch the bot's automation; they are not the automation source of truth. Add or change surfaces by editing the bot configuration, not by adding new workflow files. / 워크플로우 파일은 봇 자동화를 *디스패치*하기 위해서만 존재하며 자동화의 진실 공급원이 아닙니다. 자동화 영역을 추가/변경할 때는 새 워크플로우를 추가하지 말고 봇 구성을 변경하세요.
 
 ---
 
-## Go Automation Tools / Go 자동화 도구
+## Go Tools / Go 도구
 
 **EN**
-This repository currently has **0 Go automation tools** checked in. All automation in this project is delivered through GitHub Actions workflows (jclee-bot as the mutating owner, qodo-ai/pr-agent for non-mutating PR review). If a future Go tool is added, it will be documented in this section with its command surface and ownership boundary.
+This repository contains no Go-based automation tools. All automation logic is centralized in the `jclee-bot` service (Python) reached at `https://bot.jclee.me`, and the LLM routing layer is provided by CLIProxyAPI at `https://cliproxy.jclee.me/v1` (primary `gpt-5.5`, fallback `minimax-m3`). All internal homelab addresses are represented as opaque placeholders such as `<homelab-host>` and `<homelab-elk>` rather than concrete RFC1918 IPs or container numbers.
 
 **KR**
-이 저장소에는 현재 체크인된 **Go 자동화 도구가 0개**입니다. 본 프로젝트의 모든 자동화는 GitHub Actions 워크플로우(jclee-bot이 변경 자동화를 소유, qodo-ai/pr-agent가 비변경 PR 리뷰 담당)로 제공됩니다. 향후 Go 도구가 추가될 경우, 본 섹션에 명령어 표면과 소유 경계와 함께 문서화됩니다.
-
-For homelab-side automation, LLM-assisted authoring flows through the public endpoint `https://cliproxy.jclee.me/v1` with `gpt-5.5` as the primary model and `minimax-m3` as the fallback. The jclee-bot control plane is reachable at `https://bot.jclee.me`. README generation is one such assisted flow.
+이 저장소에는 Go 기반 자동화 도구가 포함되어 있지 않습니다. 모든 자동화 로직은 `https://bot.jclee.me`에 위치한 `jclee-bot` 서비스(Python)에 중앙 집중되어 있으며, LLM 라우팅 계층은 `https://cliproxy.jclee.me/v1`의 CLIProxyAPI(기본 `gpt-5.5`, 대체 `minimax-m3`)가 제공합니다. 사설(homelab) 내부 주소는 모두 `<homelab-host>`, `<homelab-elk>` 같은 불투명 플레이스홀더로 표현하며, RFC1918 사설 IP나 컨테이너 번호를 직접 기재하지 않습니다.
 
 ---
 
 ## Quick Start / 빠른 시작
 
 ### Prerequisites / 사전 요구사항
-- Docker 24+ and docker compose v2
-- FSDS installation (see `docs/reference_materials/lecture1_fsds_install.txt`)
-- 4+ CPU cores, 8 GB+ RAM, NVIDIA GPU recommended
-- Linux host (Ubuntu 20.04 LTS validated)
 
-### 1. Clone / 클론
+- Docker Engine 20.10+ and `docker compose` v2
+- Python 3.8+ (for running scripts outside the container)
+- ROS Noetic (only required if you want to run nodes directly on the host, not in Docker)
+- Formula Student Driverless Simulator (FSDS) installed and importable
+
+### Clone / 클론
+
 ```bash
-git clone <your-fork-or-upstream>.git hycu-fsds
-cd hycu-fsds
+git clone https://github.com/qws941/hycu-fsds-autonomous.git
+cd hycu-fsds-autonomous
 ```
 
-### 2. Start the development stack / 개발 스택 시작
+### Build the Development Stack / 개발 스택 빌드
+
 ```bash
 cd src/autonomous
-docker compose up -d
-./start.sh
+docker compose build
+./start.sh                 # bring up the dev stack
+./record_race.sh           # record rostopic + rosbag output
 ```
 
-### 3. Start the submission runtime / 제출 런타임 시작
+### Build the Frozen Submission Stack / 동결 제출 스택 빌드
+
 ```bash
 cd submission
-docker compose up -d
-./run.sh
+./dev.sh                   # iterates on the frozen stack locally
+./run.sh                   # runs the frozen image against FSDS
+cd ..
+./scripts/package.sh       # produces the submission tarball
 ```
-
-### 4. (Optional) Record a race / (선택) 레이스 레코딩
-```bash
-cd src/autonomous
-./run_all.sh
-./record_race.sh
-```
-
-### 5. Package for submission / 제출용 패키징
-```bash
-./scripts/package.sh
-```
-
-Refer to `docs/SUBMISSION_GUIDE.md` for the full evaluation flow and to `src/simulator/README.md` for simulator-specific configuration (`settings.json`).
 
 ---
 
 ## Local Development / 로컬 개발
 
-### Repository layout / 저장소 레이아웃
-```
-.
-├── AGENTS.md
-├── CONTRIBUTING.md
-├── LICENSE
-├── OWNERS
-├── README.md
-├── in-memoria.db            # race telemetry & self-learning store
-├── src/
-│   ├── autonomous/          # development stack (Docker, ROS, modules, tests)
-│   │   ├── Dockerfile
-│   │   ├── docker-compose.yml
-│   │   ├── entrypoint.sh
-│   │   ├── start.sh
-│   │   ├── run_all.sh
-│   │   ├── record_race.sh
-│   │   ├── config/
-│   │   ├── driver/competition_driver.py
-│   │   ├── modules/
-│   │   │   ├── perception/  (cone_detector, cone_classifier, slam)
-│   │   │   ├── control/     (pure_pursuit, speed)
-│   │   │   └── utils/       (lap_timer, watchdog)
-│   │   ├── scripts/start_race.py
-│   │   └── tests/test_algorithms.py
-│   └── simulator/           # FSDS settings.json
-├── scripts/
-│   └── package.sh           # submission packager
-├── docs/
-│   ├── SUBMISSION_GUIDE.md
-│   └── reference_materials/ # lecture notes (install, SLAM, V2X)
-└── submission/              # frozen runtime stack
-    ├── Dockerfile
-    ├── docker-compose.yml
-    ├── dev.sh
-    ├── run.sh
-    ├── launch/competition.launch
-    ├── src/                 # perception, control, utils, drivers, v2x
-    └── autonomous/          # containerized dev variant
+### Iteration Loop on `src/autonomous/` / 개발 스택 반복
+
+1. Edit perception / control / safety modules under `src/autonomous/modules/`.
+2. Re-launch with `./start.sh` (it sources `config/params.yaml` and `config/bridge_no_camera.launch`).
+3. Drive the FSDS simulator and watch the watchdog topic.
+4. Run unit tests:
+   ```bash
+   pytest src/autonomous/tests/test_algorithms.py
+   ```
+
+### Iteration Loop on `submission/` / 제출 스택 반복
+
+1. Edit the matching files under `submission/src/`.
+2. Rebuild the image:
+   ```bash
+   cd submission && docker compose build
+   ```
+3. Run `./run.sh` against a live FSDS instance, or `./dev.sh` for a host-mount development loop.
+
+### Recording a Race / 레이스 레코딩
+
+```bash
+cd src/autonomous
+./run_all.sh               # build → launch → record → package
 ```
 
-### Dev loop / 개발 루프
-1. Edit modules under `src/autonomous/modules/` (perception, control, utils).
-2. Update the matching mirror under `submission/src/` so the frozen stack stays aligned.
-3. Iterate via `src/autonomous/start.sh` (with hot reload) or `submission/dev.sh`.
-4. Run `python -m pytest src/autonomous/tests/test_algorithms.py` before opening a PR.
-5. Open a PR; jclee-bot and qodo-ai/pr-agent will review and route the merge.
-
-### Race harness / 레이스 하네스
-- `scripts/start_race.py` — programmatic race start.
-- `record_race.sh` — records the run to `in-memoria.db`.
-- `run_all.sh` — chains start → run → record for one-shot benchmarking.
-
-### Self-learning / 자기 학습
-- All race telemetry is appended to `in-memoria.db` at the repository root.
-- Use the homelab observability stack at `<homelab-elk>` to inspect runs and feed the in-memoria learner.
+The `record_race.sh` script produces a rostopic echo log plus a `rosbag` recording; both are written to the run directory captured by the script.
 
 ---
 
 ## Commands Reference / 명령어 레퍼런스
 
-| Command / 명령어 | Purpose / 용도 | Location / 위치 |
-|---|---|---|
-| `docker compose up -d` | Bring up dev or submission stack / 스택 기동 | `src/autonomous/`, `submission/` |
-| `./start.sh` | Start development runtime / 개발 런타임 시작 | `src/autonomous/` |
-| `./entrypoint.sh` | Container entrypoint for the dev stack | `src/autonomous/` |
-| `./run.sh` | Start frozen submission runtime / 제출 런타임 시작 | `submission/` |
-| `./dev.sh` | Submission dev mode (hot reload) | `submission/` |
-| `./run_all.sh` | Full race pipeline | `src/autonomous/` |
-| `./record_race.sh` | Record race to `in-memoria.db` | `src/autonomous/` |
-| `python scripts/start_race.py` | Programmatic race start | `src/autonomous/scripts/` |
-| `./scripts/package.sh` | Build submission artifact | repo root |
-| `python -m pytest src/autonomous/tests/test_algorithms.py` | Algorithm unit tests | `src/autonomous/tests/` |
-| `roslaunch launch/competition.launch` | Launch ROS competition graph | `submission/launch/` |
-| `roslaunch config/bridge_no_camera.launch` | Camera-less bridge for headless runs | `src/autonomous/config/` |
+| Command / 명령어 | Purpose / 용도 |
+| --- | --- |
+| `./scripts/package.sh` | Build the submission tarball from the frozen `submission/` runtime. / 동결 런타임으로 제출 tarball을 생성합니다. |
+| `cd src/autonomous && docker compose build` | Build the development Docker image. / 개발용 Docker 이미지를 빌드합니다. |
+| `cd src/autonomous && ./start.sh` | Launch the dev stack with `bridge_no_camera.launch`. / `bridge_no_camera.launch`로 개발 스택을 기동합니다. |
+| `cd src/autonomous && ./run_all.sh` | Build, launch, record, and package in one shot. / 빌드, 기동, 레코딩, 패키징을 한 번에 수행합니다. |
+| `cd src/autonomous && ./record_race.sh` | Record rostopic and rosbag output for the current run. / 현재 실행의 rostopic/rosbag 출력을 기록합니다. |
+| `python3 src/autonomous/scripts/start_race.py` | Run the race launcher state machine on the host. / 호스트에서 레이스 시작 상태기계를 실행합니다. |
+| `python3 src/autonomous/driver/competition_driver.py` | Run the top-level driver state machine directly. / 최상위 드라이버 상태기계를 직접 실행합니다. |
+| `pytest src/autonomous/tests/test_algorithms.py` | Run the algorithm unit tests. / 알고리즘 단위 테스트를 실행합니다. |
+| `cd submission && docker compose build` | Build the frozen runtime image. / 동결 런타임 이미지를 빌드합니다. |
+| `cd submission && ./dev.sh` | Develop against the frozen stack with a host mount. / 호스트 마운트로 동결 스택 위에서 개발합니다. |
+| `cd submission && ./run.sh` | Run the frozen runtime against a live FSDS instance. / 라이브 FSDS 인스턴스에서 동결 런타임을 실행합니다. |
+| `cd src/simulator && cat settings.json` | Inspect the simulator bridge settings. / 시뮬레이터 브리지 설정을 확인합니다. |
 
 ---
 
 ## Contribution Guide / 기여 가이드
 
-1. Read [`CONTRIBUTING.md`](./CONTRIBUTING.md) and [`AGENTS.md`](./AGENTS.md) before opening a PR. They define governance, agent contracts, and label semantics.
-2. Create a feature branch from `master`. jclee-bot will promote it to a PR through the branch-to-PR surface if you push to a tracked branch pattern.
-3. Make focused commits. Run `python -m pytest src/autonomous/tests/test_algorithms.py` locally.
-4. Open a PR. PR review feedback is generated by [`qodo-ai/pr-agent`](https://github.com/qodo-ai/pr-agent); jclee-bot will auto-merge once CI is green and review approval conditions are met.
-5. For Dependabot bumps, do not merge manually — jclee-bot auto-merges once CI is green.
-6. For bugs found in CI, jclee-bot will auto-file an issue; triage by applying the right label so it routes back into the issue-to-branch surface (`jclee-bot에의해자동화됨`).
-7. Releases follow the jclee-bot release notes + publish contract; do not push tags manually.
-8. Follow the `OWNERS` file for review routing.
+### Branching / 브랜치 전략
 
-### Code style / 코드 스타일
-- Python 3.8+, PEP 8 with project-specific lints enforced by the jclee-bot auto-fix surface.
-- ROS messages and topics should follow the existing naming conventions in `src/` and `submission/`.
-- All new perception / control modules must ship with a corresponding unit test under `src/autonomous/tests/`.
-- Keep `src/` and `submission/src/` algorithm paths byte-equivalent to avoid dev/eval drift.
+- Branch from `master`.
+- Use a topic prefix that matches one of the surfaces the bot tracks, e.g. `feat/`, `fix/`, `perf/`, `docs/`, `test/`, `chore/`.
+- Keep the dev stack (`src/autonomous/`) and the frozen runtime (`submission/`) in separate commits when they are intentionally diverging; the bot's auto-fix and auto-merge pipelines rely on clean per-surface commits.
 
-### Issue filing / 이슈 작성
-- Use the provided issue templates; the `jclee-bot에의해자동화됨` issue-to-branch surface picks up properly templated issues and produces a working branch + draft PR automatically.
+### Commit Messages / 커밋 메시지
 
-### Security / 보안
-- Security-relevant PRs go through the dedicated security review surface in addition to standard review.
-- Do not embed private IPs, LXC container numbers, or other infrastructure identifiers in code or docs — use the homelab placeholders `<homelab-host>` and `<homelab-elk>`.
+- Use Conventional Commits (`feat:`, `fix:`, `refactor:`, `docs:`, `test:`, `chore:`).
+- Reference the issue number with `Refs #NNN` so the bot's release-notes drafter can pick up the PR.
+
+### Code Style / 코드 스타일
+
+- Python 3.8+ baseline; PEP 8 with `black` (line length 100) and `isort`.
+- ROS Noetic: every node must publish a heartbeat that `utils/watchdog.py` can subscribe to; nodes that miss three beats in a row are stopped.
+- New perception / control modules must ship with a unit test under `src/autonomous/tests/`.
+
+### Pull Request Flow / 풀 리퀘스트 흐름
+
+1. Push the branch; the bot opens the PR automatically (branch-to-PR surface).
+2. `qodo-ai/pr-agent` posts a review with suggestions; treat them as advisory and respond or push fixes.
+3. A security-focused review pass runs in parallel.
+4. Approvals are routed by `OWNERS`.
+5. Once CI is green, reviews are non-blocking, and approvals are present, the bot auto-merges with a squash commit.
+
+### Issue Flow / 이슈 흐름
+
+- Use the provided issue templates; the bot applies labels, milestones, and the `jclee-bot에의해자동화됨` marker for any further automation on the issue.
+- Stale issues are closed by the bot's lifecycle automation; reopen with new context if still relevant.
+
+### Safety / 안전 정책
+
+- Anything that touches the throttle, brake, or steering topics must go through `control/speed.py` and `control/pure_pursuit.py`; direct writes to `/vesc/...` are blocked at the driver level.
+- The watchdog is a hard dependency — a node that cannot heartbeat is auto-stopped; do not disable it.
 
 ---
 
 ## License / 라이선스
 
-This project is released under the MIT License. See [`LICENSE`](./LICENSE) for details.
+Released under the [MIT License](./LICENSE).
 
-## Maintainers / 유지보수자
+## Maintainers / 메인테이너
 
 See [`OWNERS`](./OWNERS).
