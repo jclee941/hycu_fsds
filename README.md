@@ -1,131 +1,164 @@
-# HYCU FSDS Autonomous Driving / HYCU FSDS 자율주행
+# Formula Student Driverless — Autonomous Racing Stack
 
-> Formula Student Driverless Simulator(FSDS) 기반 자율주행 시스템
-> Autonomous driving stack targeting the Formula Student Driverless Simulator (FSDS)
+> Formula Student Driverless (FSD) 자율주행 레이싱 소프트웨어 스택
+> Autonomous racing software stack for the Formula Student Driverless competition
 
-![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)
-![ROS: Noetic](https://img.shields.io/badge/ROS-Noetic-blue)
-![Python: 3.8+](https://img.shields.io/badge/Python-3.8+-green)
-![Docker: Ready](https://img.shields.io/badge/Docker-Ready-blue)
-![Simulator: FSDS](https://img.shields.io/badge/Simulator-FSDS-orange)
-![Automator: jclee-bot](https://img.shields.io/badge/Automator-jclee--bot-purple)
-![PR Review: qodo-ai/pr-agent](https://img.shields.io/badge/PR%20Review-qodo--ai%2Fpr--agent-blue)
-![LLM Gateway: CLIProxyAPI](https://img.shields.io/badge/LLM%20Gateway-CLIProxyAPI-informational)
+이 저장소는 FSD(Formula Student Driverless) 대회를 위한 완전 자율주행 레이싱 차량 소프트웨어를 제공합니다. SLAM, 콘(코너링 마커) 감지/분류, Pure Pursuit 추종 제어, 랩 타이머, V2X(차량-사물 통신) 어댑터, 그리고 대회용 Docker 제출 패키지를 포함합니다.
+
+This repository provides a full-stack autonomous driving system for the Formula Student Driverless competition. It bundles SLAM, cone detection/classification, pure-pursuit lane following, lap timing, a V2X adapter, and a competition-ready Docker submission package.
+
+---
+
+## Table of Contents / 목차
+
+1. [Overview / 개요](#overview--개요)
+2. [Features / 주요 기능](#features--주요-기능)
+3. [Architecture / 아키텍처](#architecture--아키텍처)
+4. [Repository Layout / 저장소 구조](#repository-layout--저장소-구조)
+5. [Quick Start / 빠른 시작](#quick-start--빠른-시작)
+6. [Configuration / 설정](#configuration--설정)
+7. [Commands Reference / 명령어 레퍼런스](#commands-reference--명령어-레퍼런스)
+8. [Local Development / 로컬 개발](#local-development--로컬-개발)
+9. [Testing / 테스트](#testing--테스트)
+10. [Simulation / 시뮬레이션](#simulation--시뮬레이션)
+11. [Submission Package / 제출 패키지](#submission-package--제출-패키지)
+12. [Contributing / 기여](#contributing--기여)
+13. [License / 라이선스](#license--라이선스)
 
 ---
 
 ## Overview / 개요
 
-**EN**
-HYCU FSDS Autonomous Driving is a Dockerized ROS Noetic stack for the Formula Student Driverless Simulator (FSDS). It closes the full perception → planning → control → safety loop, ships V2X roadside-unit support, lap timing, race recording, and a competition-grade packaging pipeline. The repository is intentionally split into two parallel execution paths so the same algorithms can be iterated locally and re-built as a frozen runtime for evaluation without code drift.
+FSD 대회는 카메라와 LiDAR로 트랙을 인식하고, 미니멀 패스(노란색/파란색 콘)로 정의된 레인을 따라 자율 주행을 수행하며, V2X 인프라(RSU)와 통신해 추가 정보를 받는 종목입니다. 본 스택은 그 파이프라인을 ROS 1 기반 노드들로 구현합니다.
 
-**KR**
-HYCU FSDS Autonomous Driving은 Formula Student Driverless Simulator(FSDS) 환경을 위한 Docker 기반 ROS Noetic 자율주행 스택입니다. 인지(perception) → 계획(planning) → 제어(control) → 안전(safety) 루프를 완결하며, V2X RSU 지원, 랩 타이밍, 레이스 레코딩, 대회 제출용 패키징 파이프라인을 함께 제공합니다. 저장소는 동일한 알고리즘을 로컬에서 반복 개발하고 평가용 동결 런타임(frozen runtime)으로 재빌드할 수 있도록 두 개의 병렬 실행 경로로 의도적으로 분리되어 있습니다.
+The Formula Student Driverless competition asks teams to detect the track, follow a cone-defined lane (yellow/blue), and exchange data with a Roadside Unit (RSU) over V2X — all without a human driver. This stack implements that pipeline as a set of ROS 1 nodes.
 
-### Two Execution Paths / 두 가지 실행 경로
+대상 사용자 / Target users:
 
-1. **`src/autonomous/`** — Development-oriented stack for algorithm iteration on `bridge_no_camera.launch` and `params.yaml`. / 알고리즘 반복 개발용 자율주행 스택 (`bridge_no_camera.launch`, `params.yaml` 기반).
-2. **`submission/`** — Frozen runtime stack for competition submission, re-uses identical module names under `src/` but is rebuilt via `run.sh` / `dev.sh` and shipped as a Docker image. / 대회 제출 또는 평가를 위한 동결 실행 스택(`run.sh` / `dev.sh`로 재빌드되어 Docker 이미지로 출하).
+- FSD 대회에 참가하는 팀의 자율주행 SW 엔지니어
+- Autonomous-driving SW engineers on FSD teams
+- SLAM / computer vision / control 알고리즘을 실제 차량에 배포하려는 연구자
+- Researchers who want to deploy SLAM / CV / control algorithms on a real race car
+- 본 코드를 베이스라인으로 포크해 팀 고유 알고리즘을 시험하려는 학생 팀
+- Student teams forking the baseline to test their own algorithms
 
-The two paths share the same conceptual module layout (`perception/`, `control/`, `utils/`, `v2x/`, `driver/`) but are versioned independently so the frozen runtime cannot accidentally inherit in-progress development modules.
+엔트리 포인트 / Entry points:
+
+- Development runtime: `src/autonomous/start.sh`, `src/autonomous/run_all.sh`
+- Competition submission: `submission/run.sh`, `submission/dev.sh`
+- Launch file (ROS): `submission/launch/competition.launch`
+- Competition driver: `submission/src/drivers/competition.py`, `src/autonomous/driver/competition_driver.py`
 
 ---
 
 ## Features / 주요 기능
 
-### Perception / 인지
-- Convolutional cone detection (`perception/cone_detector.py`) — color + shape candidates from FSDS camera frames.
-- Cone classifier (`perception/cone_classifier.py`) — refines detector output into blue / yellow / orange / large classes.
-- Visual SLAM (`perception/slam.py`) — feature-based localization against the FSDS track map.
-
-### Control / 제어
-- Pure pursuit path tracker (`control/pure_pursuit.py`) — geometric steering against a smoothed centerline.
-- Speed governor (`control/speed.py`) — curvature-aware target velocity with accel / decel clamps.
-
-### Safety & Timing / 안전 및 타이밍
-- Watchdog (`utils/watchdog.py`) — heartbeat supervision of every perception and control node; emergency stop on missed beats.
-- Lap timer (`utils/lap_timer.py`) — sector splits and best-lap tracking, exposed as a ROS topic.
-
-### V2X / 차량-인프라 통신
-- Roadside unit client (`v2x/rsu.py`) — receives SPaT / MAP messages from a simulated RSU for intersection logic.
-
-### Driver Loop / 드라이버 루프
-- `driver/competition_driver.py` — top-level state machine: `WAIT → PREARM → DRIVE → FINISH`.
-- `scripts/start_race.py` — race launcher that arms the stack, runs the start light, and switches to `DRIVE`.
-
-### Race Recording / 레이스 레코딩
-- `record_race.sh` captures rostopic + rosbag output for offline replay and judging.
-- `run_all.sh` chains build → launch → record → package into a single command.
-
-### Packaging / 패키징
-- `./scripts/package.sh` produces a self-contained submission tarball with the frozen `submission/` runtime.
+- **Cone Detection** — 카메라 영상에서 콘을 감지 (`modules/perception/cone_detector.py`, `submission/src/perception/cone_detector.py`).
+- **Cone Classification** — 노란색/파란색 콘을 분류해 좌/우 레인 경계를 결정 (`modules/perception/cone_classifier.py`).
+- **SLAM** — LiDAR + IMU 기반 동시 위치추정 및 지도작성 (`modules/perception/slam.py`).
+- **Pure Pursuit Control** — 기하학 기반 조향 추종 (`modules/control/pure_pursuit.py`).
+- **Speed Control** — 곡률 기반 속도 계획 (`modules/control/speed.py`).
+- **Lap Timer** — Start/Finish 라인 통과 시 랩 타임 기록 (`modules/utils/lap_timer.py`).
+- **Watchdog** — 비정상 상태 감시 및 안전 정지 (`modules/utils/watchdog.py`).
+- **V2X / RSU** — 로드사이드 유닛과의 통신 어댑터 (`submission/src/v2x/rsu.py`).
+- **Multiple Driver Modes** — `basic`, `advanced`, `autonomous`, `competition` 4단계 드라이버 (`submission/src/drivers/`).
+- **Competition Driver** — 대회 규정(FSG Driverless)에 맞춘 통합 드라이버 (`src/autonomous/driver/competition_driver.py`).
+- **Dockerized Runtime** — 개발용과 제출용 분리된 Docker 이미지.
+- **Head-to-head Race Support** — `start_race.py`로 다중 차량 레이스 시퀀스 실행.
+- **Simulator Bridge** — 카메라이 없는 환경에서 시뮬레이터와 연동 (`config/bridge_no_camera.launch`).
 
 ---
 
 ## Architecture / 아키텍처
 
-### High-level Data Flow / 상위 데이터 흐름
+자율주행 파이프라인은 일반적으로 `Perception → Localization → Planning → Control → Actuation` 흐름을 따릅니다. 본 스택은 이를 ROS 토픽으로 연결합니다.
+
+The autonomous driving pipeline follows a standard `Perception → Localization → Planning → Control → Actuation` flow, wired together through ROS topics.
 
 ```mermaid
-flowchart TB
-  subgraph Triggers["Repository Triggers"]
-    ev["push / pull_request / issues / schedule<br/>(GitHub events)"]
-    owner["jclee-bot<br/>automation owner<br/>https://bot.jclee.me"]
-  end
+flowchart LR
+    subgraph Sensors
+        CAM["Camera<br/>/camera/image_raw"]
+        LIDAR["LiDAR<br/>/scan"]
+        IMU["IMU<br/>/imu"]
+    end
 
-  subgraph Models["Model Routing"]
-    proxy["CLIProxyAPI<br/>https://cliproxy.jclee.me/v1<br/>(public endpoint)"]
-    primary["primary model: gpt-5.5"]
-    fallback["fallback model: minimax-m3"]
-  end
+    subgraph Perception
+        CD["cone_detector"]
+        CC["cone_classifier"]
+        SLAM["slam"]
+    end
 
-  subgraph Dev["src/autonomous/ development stack"]
-    dev_perc["perception/<br/>cone_detector, cone_classifier, slam"]
-    dev_ctrl["control/<br/>pure_pursuit, speed"]
-    dev_safe["safety/<br/>watchdog, lap_timer"]
-    dev_driver["driver/competition_driver.py<br/>scripts/start_race.py"]
-  end
+    subgraph Planning
+        PP["pure_pursuit"]
+        SP["speed"]
+    end
 
-  subgraph Sub["submission/ frozen runtime"]
-    sub_perc["perception/ + v2x/rsu.py"]
-    sub_ctrl["control/ + drivers/advanced.py"]
-    sub_pack["launch/competition.launch<br/>run.sh + Dockerfile"]
-  end
+    subgraph Driver
+        BD["drivers/basic"]
+        AD["drivers/advanced"]
+        AU["drivers/autonomous"]
+        CD2["drivers/competition"]
+    end
 
-  subgraph Sim["Simulation Loop"]
-    fsds["FSDS<br/>Formula Student Driverless Simulator"]
-  end
+    subgraph V2X
+        RSU["v2x/rsu"]
+    end
 
-  subgraph Sink["Observability"]
-    elk["ELK ingest target<br/>&lt;homelab-elk&gt; placeholder<br/>(opaque log sink)"]
-    gw["&lt;homelab-host&gt;:8317 placeholder<br/>(local CLIProxyAPI instance)"]
-  end
+    subgraph Vehicle
+        VESC["VESC<br/>/commands/motor &amp; /commands/servo"]
+    end
 
-  ev --> owner
-  owner --> proxy
-  proxy --> primary
-  proxy -.fallback path.-> fallback
-  owner -->|iterate| Dev
-  owner -->|freeze and package| Sub
-  Dev <-->|bridge_no_camera.launch and params.yaml| fsds
-  Sub <-->|competition.launch| fsds
-  Dev --> elk
-  Sub --> elk
-  proxy -. local instance .- gw
+    subgraph Utils
+        LT["lap_timer"]
+        WD["watchdog"]
+    end
+
+    CAM --&gt; CD
+    CAM --&gt; CC
+    LIDAR --&gt; SLAM
+    IMU --&gt; SLAM
+    CD --&gt; CC
+    CC --&gt; PP
+    SLAM --&gt; PP
+    CC --&gt; SP
+    PP --&gt; CD2
+    SP --&gt; CD2
+    CD2 --&gt; VESC
+    RSU --&gt; CD2
+    LT --&gt; CD2
+    WD --&gt; VESC
+    BD -. fallback .-&gt; VESC
+    AD -. fallback .-&gt; VESC
+    AU -. fallback .-&gt; VESC
 ```
 
-### Stack Layout / 스택 레이아웃
+핵심 토픽 흐름 / Core topic flow:
+
+1. `cone_detector`가 카메라 입력에서 콘 후보를 추출.
+2. `cone_classifier`가 색상 분류 후 좌/우 레인 경계 발행.
+3. `slam`이 LiDAR/IMU로 차량 위치 및 콘 지도 발행.
+4. `pure_pursuit`이 중심선과 곡률을 계산.
+5. `speed`가 곡률 기반 목표 속도 계산.
+6. `drivers/competition`이 모든 입력을 합쳐 VESC 모터/서보 명령 발행.
+7. `watchdog`이 이상 상태를 감지하면 즉시 안전 정지.
+8. `lap_timer`가 랩 타임 기록.
+9. `v2x/rsu`가 외부 인프라 정보를 받아 의사결정에 반영.
+
+---
+
+## Repository Layout / 저장소 구조
 
 ```
-.
-├── AGENTS.md                 # Project knowledge base (this repo's home)
-├── CONTRIBUTING.md           # Contribution policy
-├── LICENSE                   # MIT
-├── OWNERS                    # Code owners for CODEOWNERS-driven review routing
-├── README.md                 # This document
-├── in-memoria.db             # Local SQLite cache for long-running run metadata
+/
+├── AGENTS.md
+├── CONTRIBUTING.md
+├── LICENSE
+├── OWNERS
+├── README.md
+├── in-memoria.db              # 로컬 학습/메모리 캐시 (개발용)
 ├── src/
-│   ├── autonomous/           # Development iteration stack
+│   ├── autonomous/            # 활성 개발 브랜치
 │   │   ├── AGENTS.md
 │   │   ├── Dockerfile
 │   │   ├── docker-compose.yml
@@ -133,100 +166,52 @@ flowchart TB
 │   │   ├── record_race.sh
 │   │   ├── run_all.sh
 │   │   ├── start.sh
+│   │   ├── scripts/start_race.py
 │   │   ├── config/
 │   │   │   ├── bridge_no_camera.launch
 │   │   │   └── params.yaml
-│   │   ├── driver/
-│   │   │   └── competition_driver.py
+│   │   ├── driver/competition_driver.py
 │   │   ├── modules/
 │   │   │   ├── perception/   # cone_detector, cone_classifier, slam
 │   │   │   ├── control/      # pure_pursuit, speed
 │   │   │   └── utils/        # lap_timer, watchdog
-│   │   ├── scripts/
-│   │   │   └── start_race.py
-│   │   └── tests/
-│   │       └── test_algorithms.py
-│   └── simulator/
+│   │   └── tests/test_algorithms.py
+│   └── simulator/             # 시뮬레이터 설정
 │       ├── README.md
 │       └── settings.json
 ├── scripts/
-│   └── package.sh            # Submission tarball builder
+│   └── package.sh             # 제출 패키지 빌드 스크립트
 ├── docs/
 │   ├── SUBMISSION_GUIDE.md
-│   └── reference_materials/  # FSDS install notes, SLAM and V2X lecture notebooks
-└── submission/               # Frozen runtime stack
-    ├── AGENTS.md
-    ├── Dockerfile
-    ├── README.md
-    ├── dev.sh
-    ├── docker-compose.yml
-    ├── run.sh
-    ├── launch/
-    │   └── competition.launch
-    ├── src/
-    │   ├── drivers/          # basic, autonomous, advanced, competition
-    │   ├── perception/       # cone_detector, cone_classifier, slam
-    │   ├── v2x/              # rsu.py
-    │   ├── utils/            # lap_timer, watchdog
-    │   └── control/          # pure_pursuit, speed
-    └── autonomous/           # Submission-side autonomous mirror
-        ├── Dockerfile
-        ├── docker-compose.yml
-        ├── entrypoint.sh
-        ├── run_all.sh
-        ├── start.sh
-        ├── config/params.yaml
-        ├── driver/competition_driver.py
-        └── modules/perception/
+│   └── reference_materials/   # 강의 노트/노트북 (FSDS 설치, SLAM, V2X)
+├── submission/                # 대회 제출용 패키지
+│   ├── AGENTS.md
+│   ├── Dockerfile
+│   ├── README.md
+│   ├── dev.sh
+│   ├── docker-compose.yml
+│   ├── run.sh
+│   ├── launch/competition.launch
+│   └── src/
+│       ├── drivers/           # basic, advanced, autonomous, competition
+│       ├── perception/        # cone_detector, cone_classifier, slam
+│       ├── control/           # pure_pursuit, speed
+│       ├── v2x/rsu.py
+│       ├── utils/             # lap_timer, watchdog
+│       └── autonomous/        # 제출용 자율 패키지 미러
+│           ├── Dockerfile
+│           ├── docker-compose.yml
+│           ├── entrypoint.sh
+│           ├── run_all.sh
+│           ├── start.sh
+│           ├── config/params.yaml
+│           ├── driver/competition_driver.py
+│           └── modules/perception/...
 ```
 
-> The two top-level `autonomous/` trees (`src/autonomous/` and `submission/autonomous/`) are intentionally separate so the frozen runtime stays reproducible while the development tree keeps moving.
+`src/autonomous/`는 활발한 개발을 위한 워크스페이스이고, `submission/`은 대회 규격에 맞게 패키징된 변형입니다. 두 디렉터리 모두 동일한 모듈 구조(`perception`, `control`, `v2x`, `utils`, `drivers`)를 따릅니다.
 
----
-
-## jclee-bot Automation Surfaces / jclee-bot 자동화 영역
-
-**EN**
-All mutating repository automation is owned by `jclee-bot` (reachable at `https://bot.jclee.me`). The bot is the source of truth; the GitHub workflow files under `.github/workflows/` are merely implementation triggers that fire the bot's automation. The automation surfaces are:
-
-- **Issue intake & branching** — new issues are triaged, labeled, and converted into working branches. Issue automation behavior is tagged `jclee-bot에의해자동화됨` so human reviewers can see at a glance which issues are bot-driven.
-- **Branch → PR** — working branches are automatically opened as pull requests with the correct base and reviewers resolved from `OWNERS`.
-- **PR review (general + security)** — general code review uses [qodo-ai/pr-agent](https://github.com/qodo-ai/pr-agent) as the suggestion engine; a separate security-focused review pass checks dependencies, secrets, and unsafe ROS message types.
-- **Dependabot auto-merge** — patch and minor Dependabot PRs that pass CI and review are auto-merged by jclee-bot.
-- **PR auto-merge** — PRs that pass the full gate (CI green, `qodo-ai/pr-agent` review non-blocking, approvals per `OWNERS`) are squash-merged.
-- **Bot auto-fix** — when review or CI surfaces a fixable issue, jclee-bot opens a follow-up PR against the same branch.
-- **Merged PR cleanup** — branches whose PRs are merged are deleted; stale remote refs are pruned.
-- **Issue backfill** — periodic scan of the repo for TODOs, `FIXME` comments, and crash logs that were never filed as issues, and opens them with a backfill label.
-- **Release notes & publish** — release notes are drafted from merged PRs and a release is published and tagged.
-- **Downstream health check** — pings downstream consumers (sim images, ELK ingest, etc.) and opens an issue if any consumer reports an error.
-- **CI failure issues** — when a CI run fails on `master` and is not retried successfully within a window, jclee-bot opens a labeled failure issue with the failing log attached.
-
-**KR**
-저장소의 모든 변형(mutating) 자동화는 `jclee-bot`이 소유합니다(엔드포인트: `https://bot.jclee.me`). 봇 자체가 단일 진실 공급원(Source of Truth)이며, `.github/workflows/` 안의 GitHub 워크플로우 파일들은 봇 자동화를 *발화시키는* 구현 트리거일 뿐입니다. 자동화 영역은 다음과 같이 구분됩니다.
-
-- **이슈 접수 및 브랜치 생성** — 신규 이슈를 분류·라벨링한 뒤 작업 브랜치로 변환합니다. 이슈 자동화 동작에는 `jclee-bot에의해자동화됨` 마커가 붙어, 어느 이슈가 봇에 의해 처리되고 있는지를 한눈에 식별할 수 있습니다.
-- **브랜치 → PR** — 작업 브랜치는 올바른 base 및 리뷰어(`OWNERS` 기준)와 함께 자동으로 PR로 열립니다.
-- **PR 리뷰(일반 + 보안)** — 일반 코드 리뷰는 [qodo-ai/pr-agent](https://github.com/qodo-ai/pr-agent)를 제안 엔진으로 사용하며, 별도의 보안 리뷰 패스가 의존성, 시크릿, 안전하지 않은 ROS 메시지 타입을 점검합니다.
-- **Dependabot 자동 머지** — CI와 리뷰를 통과한 Dependabot PR의 patch/minor 업데이트는 jclee-bot이 자동 머지합니다.
-- **PR 자동 머지** — 전체 게이트(CI 통과, `qodo-ai/pr-agent` 리뷰 비차단, `OWNERS` 승인)를 통과한 PR은 squash 머지됩니다.
-- **봇 자동 수정** — 리뷰나 CI가 수정 가능한 사안을 발견하면, jclee-bot이 동일 브랜치에 후속 PR을 엽니다.
-- **머지된 PR 정리** — PR이 머지된 브랜치는 삭제되고 원격 ref가 가지치기됩니다.
-- **이슈 백필** — 주기적으로 저장소를 스캔하여 이슈로 등록되지 않은 `TODO`/`FIXME` 주석과 크래시 로그를 발견하면 백필 라벨과 함께 이슈를 엽니다.
-- **릴리스 노트 및 퍼블리시** — 머지된 PR로부터 릴리스 노트가 초안 작성되며, 릴리스가 퍼블리시·태깅됩니다.
-- **다운스트림 헬스 체크** — 다운스트림 컨슈머(시뮬레이터 이미지, ELK 인제스트 등)에 헬스 체크를 보내고 오류가 보고되면 이슈를 엽니다.
-- **CI 실패 이슈** — `master`에서 CI가 실패한 후 일정 시간 내 재시도 성공이 없으면, jclee-bot이 실패 로그를 첨부한 라벨된 이슈를 엽니다.
-
-> Workflow files exist only to dispatch the bot's automation; they are not the automation source of truth. Add or change surfaces by editing the bot configuration, not by adding new workflow files. / 워크플로우 파일은 봇 자동화를 *디스패치*하기 위해서만 존재하며 자동화의 진실 공급원이 아닙니다. 자동화 영역을 추가/변경할 때는 새 워크플로우를 추가하지 말고 봇 구성을 변경하세요.
-
----
-
-## Go Tools / Go 도구
-
-**EN**
-This repository contains no Go-based automation tools. All automation logic is centralized in the `jclee-bot` service (Python) reached at `https://bot.jclee.me`, and the LLM routing layer is provided by CLIProxyAPI at `https://cliproxy.jclee.me/v1` (primary `gpt-5.5`, fallback `minimax-m3`). All internal homelab addresses are represented as opaque placeholders such as `<homelab-host>` and `<homelab-elk>` rather than concrete RFC1918 IPs or container numbers.
-
-**KR**
-이 저장소에는 Go 기반 자동화 도구가 포함되어 있지 않습니다. 모든 자동화 로직은 `https://bot.jclee.me`에 위치한 `jclee-bot` 서비스(Python)에 중앙 집중되어 있으며, LLM 라우팅 계층은 `https://cliproxy.jclee.me/v1`의 CLIProxyAPI(기본 `gpt-5.5`, 대체 `minimax-m3`)가 제공합니다. 사설(homelab) 내부 주소는 모두 `<homelab-host>`, `<homelab-elk>` 같은 불투명 플레이스홀더로 표현하며, RFC1918 사설 IP나 컨테이너 번호를 직접 기재하지 않습니다.
+`src/autonomous/` is the active development workspace; `submission/` is a competition-packaged variant. Both share the same module layout (`perception`, `control`, `v2x`, `utils`, `drivers`).
 
 ---
 
@@ -234,133 +219,280 @@ This repository contains no Go-based automation tools. All automation logic is c
 
 ### Prerequisites / 사전 요구사항
 
-- Docker Engine 20.10+ and `docker compose` v2
-- Python 3.8+ (for running scripts outside the container)
-- ROS Noetic (only required if you want to run nodes directly on the host, not in Docker)
-- Formula Student Driverless Simulator (FSDS) installed and importable
+- Docker 20.10+ and Docker Compose v2
+- 호스트가 Linux이고 USB 시리얼/카메라 디바이스 접근 가능
+- (선택) ROS 1 Noetic — 컨테이너 외부에서 토픽을 디버깅하려는 경우
+- (Optional) ROS 1 Noetic — only for host-side topic inspection
 
-### Clone / 클론
+### 1) Clone / 클론
 
 ```bash
-git clone https://github.com/qws941/hycu-fsds-autonomous.git
-cd hycu-fsds-autonomous
+git clone <your-fork-url> fsd-stack
+cd fsd-stack
 ```
 
-### Build the Development Stack / 개발 스택 빌드
+### 2) Run the autonomous stack / 자율주행 스택 실행
+
+개발 워크스페이스:
 
 ```bash
 cd src/autonomous
-docker compose build
-./start.sh                 # bring up the dev stack
-./record_race.sh           # record rostopic + rosbag output
+docker compose up --build
 ```
 
-### Build the Frozen Submission Stack / 동결 제출 스택 빌드
+또는 호스트에서 직접:
+
+```bash
+cd src/autonomous
+./start.sh           # 단일 런
+./run_all.sh         # 전체 파이프라인 (추천)
+```
+
+### 3) Run the competition submission / 대회 제출 패키지 실행
 
 ```bash
 cd submission
-./dev.sh                   # iterates on the frozen stack locally
-./run.sh                   # runs the frozen image against FSDS
-cd ..
-./scripts/package.sh       # produces the submission tarball
+./dev.sh             # 개발 모드 (디버깅 로그 ON)
+./run.sh             # 대회 모드 (대회 규정 준수)
+```
+
+### 4) Record a race / 레이스 기록
+
+```bash
+cd src/autonomous
+./record_race.sh
+# 또는 다중 차량 레이스:
+python3 scripts/start_race.py
+```
+
+`record_race.sh`는 ROS bag을 저장하고, `start_race.py`는 head-to-head 레이스 시퀀스를 트리거합니다.
+
+---
+
+## Configuration / 설정
+
+주요 설정 파일은 YAML 형식입니다. ROS 파라미터 서버에서 로드됩니다.
+
+| File / 파일 | Purpose / 용도 |
+|------------|---------------|
+| `src/autonomous/config/params.yaml` | 개발 워크스페이스의 모든 노드 파라미터 |
+| `submission/autonomous/config/params.yaml` | 제출 패키지용 파라미터 미러 |
+| `simulator/settings.json` | 시뮬레이터 트랙/차량/센서 설정 |
+| `submission/launch/competition.launch` | 대회 런치 (토픽, 노드, 리매핑) |
+| `src/autonomous/config/bridge_no_camera.launch` | 카메라가 없을 때 시뮬레이터로 브릿지 |
+
+예시 파라미터 키 / Example keys (representative — 실제 키는 `params.yaml` 참조):
+
+```yaml
+perception:
+  cone_detector:
+    model_path: /opt/fsd/models/yolov8n-cone.engine
+    conf_threshold: 0.35
+    input_topic: /camera/image_raw
+  cone_classifier:
+    yellow_hsv_lower: [20, 100, 100]
+    yellow_hsv_upper: [35, 255, 255]
+control:
+  pure_pursuit:
+    lookahead_m: 2.5
+    wheelbase_m: 1.55
+  speed:
+    max_speed_mps: 12.0
+    min_speed_mps: 2.0
+    curvature_gain: 4.0
+safety:
+  watchdog:
+    heartbeat_timeout_ms: 250
+    e_stop_topic: /emergency_stop
+v2x:
+  rsu:
+    host: <rsu-host>
+    port: 5555
+    enabled: true
+```
+
+> 실제 키 이름은 사용 중인 모델 버전과 대회 규정 버전에 따라 달라질 수 있습니다. 반드시 `params.yaml`을 직접 확인하세요.
+> Actual key names depend on the model and rulebook version. Always verify against `params.yaml`.
+
+---
+
+## Commands Reference / 명령어 레퍼런스
+
+### Autonomous development / 자율주행 개발
+
+| Script / 스크립트 | Description / 설명 |
+|------------------|-------------------|
+| `src/autonomous/start.sh` | 메인 런치 실행 (단일 실행) |
+| `src/autonomous/run_all.sh` | 전체 파이프라인 실행 (추천) |
+| `src/autonomous/record_race.sh` | ROS bag 녹화 모드로 실행 |
+| `src/autonomous/scripts/start_race.py` | head-to-head 레이스 시퀀스 시작 |
+| `src/autonomous/entrypoint.sh` | 컨테이너 진입 시 자동 실행 |
+
+### Submission / 제출 패키지
+
+| Script / 스크립트 | Description / 설명 |
+|------------------|-------------------|
+| `submission/run.sh` | 대회 모드 런 |
+| `submission/dev.sh` | 개발 모드 런 (verbose 로그) |
+| `scripts/package.sh` | 제출용 아카이브 빌드 |
+
+### Docker Compose / Docker Compose
+
+```bash
+# 개발 워크스페이스
+cd src/autonomous
+docker compose up --build            # 포어그라운드
+docker compose up --build -d         # 백그라운드
+docker compose logs -f autonomous    # 로그 스트림
+docker compose down                  # 정리
+
+# 제출 패키지
+cd submission
+docker compose up --build
+```
+
+### ROS introspection / ROS 디버깅 (호스트에서)
+
+```bash
+docker compose exec autonomous bash
+source /opt/ros/noetic/setup.bash
+rosnode list
+rostopic list
+rostopic echo /vesc/odom
+rqt_graph
 ```
 
 ---
 
 ## Local Development / 로컬 개발
 
-### Iteration Loop on `src/autonomous/` / 개발 스택 반복
+### Recommended workflow / 권장 워크플로
 
-1. Edit perception / control / safety modules under `src/autonomous/modules/`.
-2. Re-launch with `./start.sh` (it sources `config/params.yaml` and `config/bridge_no_camera.launch`).
-3. Drive the FSDS simulator and watch the watchdog topic.
-4. Run unit tests:
-   ```bash
-   pytest src/autonomous/tests/test_algorithms.py
-   ```
+1. `src/autonomous/`에서 알고리즘을 수정합니다.
+2. `tests/test_algorithms.py`로 단위 테스트를 실행합니다.
+3. `record_race.sh`로 bag을 수집해 시뮬레이터에서 회귀 테스트를 수행합니다.
+4. 안정화된 변경만 `submission/`으로 동기화합니다 (`scripts/package.sh`로 패키징).
 
-### Iteration Loop on `submission/` / 제출 스택 반복
+1. Modify algorithms under `src/autonomous/`.
+2. Run unit tests via `tests/test_algorithms.py`.
+3. Record bags with `record_race.sh` and replay in the simulator.
+4. Once stable, sync to `submission/` and run `scripts/package.sh` to build a competition archive.
 
-1. Edit the matching files under `submission/src/`.
-2. Rebuild the image:
-   ```bash
-   cd submission && docker compose build
-   ```
-3. Run `./run.sh` against a live FSDS instance, or `./dev.sh` for a host-mount development loop.
+### Code conventions / 코드 컨벤션
 
-### Recording a Race / 레이스 레코딩
+- Python 3, PEP 8, 4-space indent.
+- ROS 노드는 `if __name__ == "__main__"` 패턴 + `rospy.init_node(...)`.
+- 새 토픽은 `params.yaml`에 명시적으로 등록.
+- 안전(safety) 관련 코드는 `watchdog`와 반드시 연동.
+
+### Adding a new driver mode / 새 드라이버 모드 추가
+
+1. `submission/src/drivers/`에 `<name>.py` 생성.
+2. `BaseDriver` 또는 기존 `basic.py`를 상속.
+3. `submission/launch/competition.launch`에 노드 등록.
+4. `params.yaml`에 토픽/파라미터 추가.
+5. `tests/`에 단위 테스트 추가.
+
+---
+
+## Testing / 테스트
 
 ```bash
 cd src/autonomous
-./run_all.sh               # build → launch → record → package
+python3 -m pytest tests/ -v
 ```
 
-The `record_race.sh` script produces a rostopic echo log plus a `rosbag` recording; both are written to the run directory captured by the script.
+또는 ROS 환경 안에서:
+
+```bash
+cd src/autonomous
+docker compose run --rm autonomous bash -lc "source /opt/ros/noetic/setup.bash && python3 -m pytest tests/ -v"
+```
+
+테스트는 알고리즘 단위(perception, control, utils)를 다룹니다. 통합 테스트는 시뮬레이터에서 ROS bag을 재생해 수행합니다.
+
+The test suite covers unit-level algorithms (perception, control, utils). Integration tests replay recorded ROS bags through the simulator.
 
 ---
 
-## Commands Reference / 명령어 레퍼런스
+## Simulation / 시뮬레이션
 
-| Command / 명령어 | Purpose / 용도 |
-| --- | --- |
-| `./scripts/package.sh` | Build the submission tarball from the frozen `submission/` runtime. / 동결 런타임으로 제출 tarball을 생성합니다. |
-| `cd src/autonomous && docker compose build` | Build the development Docker image. / 개발용 Docker 이미지를 빌드합니다. |
-| `cd src/autonomous && ./start.sh` | Launch the dev stack with `bridge_no_camera.launch`. / `bridge_no_camera.launch`로 개발 스택을 기동합니다. |
-| `cd src/autonomous && ./run_all.sh` | Build, launch, record, and package in one shot. / 빌드, 기동, 레코딩, 패키징을 한 번에 수행합니다. |
-| `cd src/autonomous && ./record_race.sh` | Record rostopic and rosbag output for the current run. / 현재 실행의 rostopic/rosbag 출력을 기록합니다. |
-| `python3 src/autonomous/scripts/start_race.py` | Run the race launcher state machine on the host. / 호스트에서 레이스 시작 상태기계를 실행합니다. |
-| `python3 src/autonomous/driver/competition_driver.py` | Run the top-level driver state machine directly. / 최상위 드라이버 상태기계를 직접 실행합니다. |
-| `pytest src/autonomous/tests/test_algorithms.py` | Run the algorithm unit tests. / 알고리즘 단위 테스트를 실행합니다. |
-| `cd submission && docker compose build` | Build the frozen runtime image. / 동결 런타임 이미지를 빌드합니다. |
-| `cd submission && ./dev.sh` | Develop against the frozen stack with a host mount. / 호스트 마운트로 동결 스택 위에서 개발합니다. |
-| `cd submission && ./run.sh` | Run the frozen runtime against a live FSDS instance. / 라이브 FSDS 인스턴스에서 동결 런타임을 실행합니다. |
-| `cd src/simulator && cat settings.json` | Inspect the simulator bridge settings. / 시뮬레이터 브리지 설정을 확인합니다. |
+`src/simulator/`는 트랙, 차량 동역학, 센서 모델을 정의합니다.
+
+The `src/simulator/` directory defines the track, vehicle dynamics, and sensor models.
+
+```bash
+# 시뮬레이터 설정 확인
+cat src/simulator/settings.json
+
+# 카메라 없이 시뮬레이터만으로 실행
+roslaunch src/autonomous/config/bridge_no_camera.launch
+```
+
+자세한 내용은 `src/simulator/README.md`를 참조하세요.
+
+See `src/simulator/README.md` for details.
 
 ---
 
-## Contribution Guide / 기여 가이드
+## Submission Package / 제출 패키지
 
-### Branching / 브랜치 전략
+`submission/`은 대회 운영 측에 제출하는 형태 그대로 패키징된 디렉터리입니다. ROS 워크스페이스, Docker 설정, 런치 파일, 그리고 소스 트리 미러가 포함됩니다.
 
-- Branch from `master`.
-- Use a topic prefix that matches one of the surfaces the bot tracks, e.g. `feat/`, `fix/`, `perf/`, `docs/`, `test/`, `chore/`.
-- Keep the dev stack (`src/autonomous/`) and the frozen runtime (`submission/`) in separate commits when they are intentionally diverging; the bot's auto-fix and auto-merge pipelines rely on clean per-surface commits.
+The `submission/` directory is the ready-to-submit variant, containing a ROS workspace, Docker setup, launch files, and a mirrored source tree.
 
-### Commit Messages / 커밋 메시지
+자세한 절차는 `docs/SUBMISSION_GUIDE.md`를 참조하세요.
 
-- Use Conventional Commits (`feat:`, `fix:`, `refactor:`, `docs:`, `test:`, `chore:`).
-- Reference the issue number with `Refs #NNN` so the bot's release-notes drafter can pick up the PR.
+For step-by-step instructions, see `docs/SUBMISSION_GUIDE.md`.
 
-### Code Style / 코드 스타일
+요약 / Summary:
 
-- Python 3.8+ baseline; PEP 8 with `black` (line length 100) and `isort`.
-- ROS Noetic: every node must publish a heartbeat that `utils/watchdog.py` can subscribe to; nodes that miss three beats in a row are stopped.
-- New perception / control modules must ship with a unit test under `src/autonomous/tests/`.
+1. `submission/dev.sh`로 로컬에서 충분히 시험.
+2. `scripts/package.sh`로 아카이브 생성.
+3. `docs/SUBMISSION_GUIDE.md`의 체크리스트에 따라 제출.
 
-### Pull Request Flow / 풀 리퀘스트 흐름
+---
 
-1. Push the branch; the bot opens the PR automatically (branch-to-PR surface).
-2. `qodo-ai/pr-agent` posts a review with suggestions; treat them as advisory and respond or push fixes.
-3. A security-focused review pass runs in parallel.
-4. Approvals are routed by `OWNERS`.
-5. Once CI is green, reviews are non-blocking, and approvals are present, the bot auto-merges with a squash commit.
+## Contributing / 기여
 
-### Issue Flow / 이슈 흐름
+기여 절차는 [`CONTRIBUTING.md`](CONTRIBUTING.md)를 따릅니다. 큰 변경 전에는 `AGENTS.md`와 `submission/AGENTS.md`를 먼저 확인하세요.
 
-- Use the provided issue templates; the bot applies labels, milestones, and the `jclee-bot에의해자동화됨` marker for any further automation on the issue.
-- Stale issues are closed by the bot's lifecycle automation; reopen with new context if still relevant.
+Please follow [`CONTRIBUTING.md`](CONTRIBUTING.md). Read `AGENTS.md` and `submission/AGENTS.md` before opening large changes.
 
-### Safety / 안전 정책
+기본 원칙 / Ground rules:
 
-- Anything that touches the throttle, brake, or steering topics must go through `control/speed.py` and `control/pure_pursuit.py`; direct writes to `/vesc/...` are blocked at the driver level.
-- The watchdog is a hard dependency — a node that cannot heartbeat is auto-stopped; do not disable it.
+- Pull request 한 개당 한 가지 변경.
+- 새 기능은 `src/autonomous/`에서 먼저 개발, 검증 후 `submission/`에 동기화.
+- 안전(safety)에 영향을 주는 변경은 별도 라벨과 리뷰어 1인 이상 필요.
+- 대회 규정(FSG Driverless Rulebook) 위반 여부를 PR 본문에 명시.
+
+---
+
+## Reference Materials / 참고 자료
+
+`docs/reference_materials/`에 학습용 자료가 있습니다:
+
+- `lecture1_fsds_install.txt` — FSDS(FSD Simulator) 설치 가이드
+- `lecture4_slam.ipynb` — SLAM 강의 노트북
+- `lecture6_v2x.ipynb` — V2X 강의 노트북
+
+`docs/reference_materials/` contains educational material:
+
+- `lecture1_fsds_install.txt` — FSD Simulator install guide
+- `lecture4_slam.ipynb` — SLAM lecture notebook
+- `lecture6_v2x.ipynb` — V2X lecture notebook
 
 ---
 
 ## License / 라이선스
 
-Released under the [MIT License](./LICENSE).
+본 저장소는 [`LICENSE`](LICENSE) 파일에 명시된 라이선스를 따릅니다. 대회에 제출하는 경우, 외부 코드/모델의 라이선스 호환성을 PR 본문에 명시해야 합니다.
 
-## Maintainers / 메인테이너
+This repository is distributed under the license stated in [`LICENSE`](LICENSE). When submitting to a competition, you must declare the license compatibility of any third-party code or models in the PR body.
 
-See [`OWNERS`](./OWNERS).
+---
+
+## Maintainers / 유지보수
+
+- 코드 오너십은 [`OWNERS`](OWNERS) 파일을 참조.
+- See [`OWNERS`](OWNERS) for current code ownership.
