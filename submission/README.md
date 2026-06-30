@@ -6,54 +6,34 @@
 
 ## 시스템 아키텍처
 
-```mermaid
-graph TB
-    subgraph "Windows Host"
-        FSDS[FSDS Simulator<br/>Unreal Engine]
-    end
-    
-    subgraph "Docker Container (ROS Noetic)"
-        subgraph "Perception"
-            LIDAR[LiDAR Subscriber<br/>/fsds/lidar/Lidar1]
-            ODOM[Odometry Subscriber<br/>/fsds/testing_only/odom]
-        end
-        
-        subgraph "Planning & Control"
-            DRIVER[Competition Driver<br/>Pure Pursuit + 곡률 속도]
-            STATE[State Machine<br/>TRACKING/DEGRADED/STOPPING]
-        end
-        
-        subgraph "Safety Layer"
-            WATCHDOG[Watchdog<br/>센서 Stale 감지]
-            ESTOP[E-Stop Handler]
-        end
-        
-        subgraph "V2X (가산점)"
-            RSU[Virtual RSU<br/>v2x_rsu.py]
-            V2X_SUB[V2X Subscriber<br/>speed_limit/hazard/stop]
-        end
-        
-        subgraph "SLAM (가산점)"
-            SLAM[Simple SLAM<br/>Occupancy Grid]
-            TF[TF Tree<br/>map→odom→base_link]
-        end
-        
-        CMD[Control Command<br/>/fsds/control_command]
-    end
-    
-    FSDS -->|PointCloud2| LIDAR
-    FSDS -->|Odometry| ODOM
-    LIDAR --> DRIVER
-    ODOM --> DRIVER
-    DRIVER --> STATE
-    STATE --> WATCHDOG
-    RSU -->|V2X Messages| V2X_SUB
-    V2X_SUB --> DRIVER
-    ODOM --> SLAM
-    LIDAR --> SLAM
-    DRIVER --> CMD
-    CMD -->|throttle/steering/brake| FSDS
-```
+#### Diagram summary 1
+
+- Type: flowchart
+- Component: FSDS Simulator / Unreal Engine (FSDS)
+- Component: LiDAR Subscriber / /fsds/lidar/Lidar1 (LIDAR)
+- Component: Odometry Subscriber / /fsds/testingonly/odom (ODOM)
+- Component: Competition Driver / Pure Pursuit + 곡률 속도 (DRIVER)
+- Component: State Machine / TRACKING/DEGRADED/STOPPING (STATE)
+- Component: Watchdog / 센서 Stale 감지 (WATCHDOG)
+- Component: E-Stop Handler (ESTOP)
+- Component: Virtual RSU / v2xrsu.py (RSU)
+- Component: V2X Subscriber / speedlimit/hazard/stop (V2XSUB)
+- Component: Simple SLAM / Occupancy Grid (SLAM)
+- Component: TF Tree / map→odom→baselink (TF)
+- Component: Control Command / /fsds/controlcommand (CMD)
+- FSDS Simulator / Unreal Engine (FSDS) -> LiDAR Subscriber / /fsds/lidar/Lidar1 (LIDAR)
+- FSDS Simulator / Unreal Engine (FSDS) -> Odometry Subscriber / /fsds/testingonly/odom (ODOM)
+- LiDAR Subscriber / /fsds/lidar/Lidar1 (LIDAR) -> Competition Driver / Pure Pursuit + 곡률 속도 (DRIVER)
+- Odometry Subscriber / /fsds/testingonly/odom (ODOM) -> Competition Driver / Pure Pursuit + 곡률 속도 (DRIVER)
+- Competition Driver / Pure Pursuit + 곡률 속도 (DRIVER) -> State Machine / TRACKING/DEGRADED/STOPPING (STATE)
+- State Machine / TRACKING/DEGRADED/STOPPING (STATE) -> Watchdog / 센서 Stale 감지 (WATCHDOG)
+- Virtual RSU / v2xrsu.py (RSU) -> V2X Subscriber / speedlimit/hazard/stop (V2XSUB)
+- V2X Subscriber / speedlimit/hazard/stop (V2XSUB) -> Competition Driver / Pure Pursuit + 곡률 속도 (DRIVER)
+- Odometry Subscriber / /fsds/testingonly/odom (ODOM) -> Simple SLAM / Occupancy Grid (SLAM)
+- LiDAR Subscriber / /fsds/lidar/Lidar1 (LIDAR) -> Simple SLAM / Occupancy Grid (SLAM)
+- Competition Driver / Pure Pursuit + 곡률 속도 (DRIVER) -> Control Command / /fsds/controlcommand (CMD)
+- Control Command / /fsds/controlcommand (CMD) -> FSDS Simulator / Unreal Engine (FSDS)
+
 
 ## 안전성 및 신뢰성 (Safety & Robustness)
 
@@ -159,35 +139,24 @@ fsds_docker/
 
 ### Pure Pursuit 알고리즘
 
-```mermaid
-graph LR
-    subgraph Input
-        LIDAR[LiDAR PointCloud]
-        ODOM[Odometry]
-    end
-    
-    subgraph ConeDetection
-        FILTER["Z-Filter<br/>-0.3m ~ 0.5m"]
-        CLUSTER[Grid-based Clustering]
-        SPLIT["Left/Right Split<br/>y > 0: Left"]
-    end
-    
-    subgraph PathPlanning
-        CENTER["Centerline<br/>Left+Right Avg"]
-        LOOKAHEAD["Lookahead Point<br/>4.0m Ahead"]
-    end
-    
-    subgraph Control
-        STEER["Pure Pursuit<br/>delta = atan2(2L*sin(a), ld)"]
-        SPEED["Curvature Speed<br/>v = sqrt(a_lat_max / k)"]
-    end
-    
-    LIDAR --> FILTER --> CLUSTER --> SPLIT
-    SPLIT --> CENTER --> LOOKAHEAD
-    ODOM --> LOOKAHEAD
-    LOOKAHEAD --> STEER --> CMD[ControlCommand]
-    CENTER --> SPEED --> CMD
-```
+#### Diagram summary 2
+
+- Type: flowchart
+- Component: LiDAR PointCloud (LIDAR)
+- Component: Odometry (ODOM)
+- Component: Z-Filter / -0.3m ~ 0.5m (FILTER)
+- Component: Grid-based Clustering (CLUSTER)
+- Component: Left/Right Split / y > 0: Left (SPLIT)
+- Component: Centerline / Left+Right Avg (CENTER)
+- Component: Lookahead Point / 4.0m Ahead (LOOKAHEAD)
+- Component: Pure Pursuit / delta = atan2(2Lsin(a), ld) (STEER)
+- Component: Curvature Speed / v = sqrt(alatmax / k) (SPEED)
+- LiDAR PointCloud (LIDAR) -> Z-Filter / -0.3m ~ 0.5m (FILTER)
+- Left/Right Split / y > 0: Left (SPLIT) -> Centerline / Left+Right Avg (CENTER)
+- Odometry (ODOM) -> Lookahead Point / 4.0m Ahead (LOOKAHEAD)
+- Lookahead Point / 4.0m Ahead (LOOKAHEAD) -> Pure Pursuit / delta = atan2(2Lsin(a), ld) (STEER)
+- Centerline / Left+Right Avg (CENTER) -> Curvature Speed / v = sqrt(alatmax / k) (SPEED)
+
 
 ### 파라미터 튜닝 가이드
 
