@@ -1,225 +1,288 @@
-# FSD 자율주행 시스템 (Formula Student Driverless Stack)
+# FSDS 자율주행 스택
 
-![ROS2](https://img.shields.io/badge/ROS2-Humble-F74C00)
-![Python](https://img.shields.io/badge/Python-3.10-3776AB)
-![Docker](https://img.shields.io/badge/Docker-ready-2496ED)
-![Status](https://img.shields.io/badge/Status-Competition--Ready-2EA043)
-![License](https://img.shields.io/badge/License-Check%20LICENSE-blue)
+ROS 1 기반 Formula Student Driverless Simulator(FSDS) 자율주행 레이스 스택. 콘(cone) 검출·SLAM·Pure Pursuit 추종·V2X 통신을 한 Docker 실행 환경으로 묶고, 대회 제출용 패키지까지 함께 제공한다.
 
-## 한국어 요약
+| ![ROS](https://img.shields.io/badge/ROS-Noetic-22314E?logo=ros) | ![Python](https://img.shields.io/badge/Python-3.8%2B-3776AB?logo=python) | ![Docker](https://img.shields.io/badge/Docker-ready-2496ED?logo=docker) | ![Simulator](https://img.shields.io/badge/FSDS-LFS--19.04-orange) | ![Mode](https://img.shields.io/badge/Mode-Autonomous%20%7C%20Submission-success) |
+| --- | --- | --- | --- | --- |
 
-Formula Student Driverless Simulator(FSDS) 대회를 위한 ROS2 기반 자율주행 스택입니다.
-콘 인식, SLAM, Pure Pursuit 경로 추종, 속도 제어, V2X(RSU), 랩 타이머·워치독을 한 묶음으로
-제공하며, `src/autonomous/`(개발·시뮬레이터)와 `submission/`(대회 제출) 두 런타임으로
-동작합니다.
+## 한 줄 요약
 
-## English Summary
+FSDS 시뮬레이터에서 콘 트랙을 인식해 자율 주행을 수행하고, 대회 제출용 Docker 이미지로 패키징하는 Python/ROS 스택.
 
-ROS2-based autonomous driving stack for the Formula Student Driverless (FSD) competition.
-It packages cone perception, SLAM, pure-pursuit path following, speed control, V2X (RSU),
-and lap-timer/watchdog utilities into two runtimes: `src/autonomous/` for development and
-`submission/` for the official competition submission.
-
-## Quick Status
+## 빠른 상태
 
 | 항목 | 값 |
 | --- | --- |
-| 대상 대회 | Formula Student Driverless (FSDS) |
-| 미들웨어 | ROS2 (Humble) |
-| 개발 런타임 | `src/autonomous/` |
-| 제출 런타임 | `submission/` |
-| 시뮬레이터 | `src/simulator/settings.json` |
-| 컨테이너 | Docker / docker-compose |
-| 단위 테스트 | `src/autonomous/tests/` |
-| 제출 진입점 | `submission/run.sh` |
-| 개발 진입점 | `src/autonomous/run_all.sh` |
-| 라이선스 | `LICENSE` 참조 |
+| 대상 플랫폼 | Ubuntu 20.04 + ROS Noetic |
+| 시뮬레이터 | Formula Student Driverless Simulator (FSDS) |
+| 언어 | Python 3 |
+| 핵심 노드 그룹 | perception, control, v2x, utils |
+| 실행 모드 | `autonomous` (개발/시뮬레이션), `submission` (대회 제출) |
+| 컨테이너 | Docker, docker-compose |
+| 문서 | `docs/SUBMISSION_GUIDE.md` |
+| 라이선스 | `LICENSE` |
 
-## 운영 흐름 (Compact Flow)
+## 실행 흐름 요약
 
-1. 시뮬레이터(FSDS) 또는 차량에서 카메라·LiDAR 토픽 수신
-2. `perception/cone_detector.py`로 콘 후보 검출
-3. `perception/cone_classifier.py`로 색상(파랑·노랑·주황) 분류
-4. `perception/slam.py`로 트랙 지도와 차량 위치 추정
-5. `control/pure_pursuit.py` + `control/speed.py`로 조향·속도 명령 생성
-6. `v2x/rsu.py`로 외부 인프라 신호 수신
-7. `utils/lap_timer.py` + `utils/watchdog.py`로 랩 카운트와 페일세이프 수행
-8. `driver/competition_driver.py`가 위 모듈 전체를 오케스트레이션
+1. FSDS 시뮬레이터에서 트랙을 로드하고 차량을 스폰한다.
+2. `src/autonomous` 또는 `src/submission`에서 docker-compose를 기동한다.
+3. `competition.launch` 또는 `bridge_no_camera.launch`가 perception / control / v2x 노드를 로드한다.
+4. `competition_driver.py`가 콘 검출 → SLAM → Pure Pursuit → 속도 제어를 순차 구동한다.
+5. `lap_timer`가 랩 타임을 기록하고 `watchdog`가 비정상 상태를 감시한다.
+6. `scripts/package.sh`로 대회 제출용 아카이브를 생성한다.
 
-## Table of Contents
+## 목차
 
-1. [Purpose & Package Contents](#purpose--package-contents)
-2. [First Files to Read](#first-files-to-read)
-3. [Architecture](#architecture)
-4. [Quick Start](#quick-start)
-5. [Configuration](#configuration)
-6. [Entry Points & Commands](#entry-points--commands)
-7. [Local Development](#local-development)
-8. [Testing](#testing)
-9. [Contribution Guide](#contribution-guide)
-10. [Maintainers & Contact](#maintainers--contact)
-11. [License & Further Docs](#license--further-docs)
+- [프로젝트 개요](#프로젝트-개요)
+- [패키지 구성](#패키지-구성)
+- [상태 및 지원 범위](#상태-및-지원-범위)
+- [먼저 읽을 파일](#먼저-읽을-파일)
+- [진입점 (Entry Points)](#진입점-entry-points)
+- [아키텍처](#아키텍처)
+- [빠른 시작](#빠른-시작)
+- [명령어 참조](#명령어-참조)
+- [구성 (Configuration)](#구성-configuration)
+- [로컬 개발](#로컬-개발)
+- [테스트](#테스트)
+- [기여 가이드](#기여-가이드)
+- [유지보수자 및 연락처](#유지보수자-및-연락처)
+- [추가 문서](#추가-문서)
+- [라이선스](#라이선스)
 
-## Purpose & Package Contents
+## 프로젝트 개요
 
-FSD 자율주행 알고리즘을 ROS2 노드 단위로 모듈화하고, 대회 제출에 그대로 쓸 수 있는
-Docker 이미지로 패키징한 저장소입니다.
+이 저장소는 FSDS(FSD Simulator) 위에서 동작하는 **Formula Student Driverless** 자율주행 파이프라인이다. 시뮬레이션 주행뿐 아니라 실차 제출 패키지까지 동일한 코드 베이스에서 만들 수 있도록 두 가지 실행 모드를 함께 둔다.
 
-| 경로 | 역할 |
-| --- | --- |
-| `src/autonomous/` | 개발·시뮬레이터 구동 런타임 |
-| `src/autonomous/modules/perception/` | 콘 검출·분류·SLAM |
-| `src/autonomous/modules/control/` | Pure Pursuit, 속도 |
-| `src/autonomous/modules/utils/` | 랩 타이머, 워치독 |
-| `src/autonomous/driver/` | 대회용 통합 드라이버 |
-| `src/autonomous/config/` | launch, params 설정 |
-| `src/simulator/` | FSDS 시뮬레이터 설정 |
-| `submission/` | 대회 제출 패키지 |
-| `submission/src/drivers/` | basic/advanced/autonomous/competition |
-| `submission/src/v2x/` | RSU 통신 |
-| `submission/launch/` | ROS2 런처 |
-| `docs/SUBMISSION_GUIDE.md` | 대회 제출 절차 |
-| `docs/reference_materials/` | FSDS·SLAM·V2X 참고 |
-| `scripts/package.sh` | 제출물 패키징 |
-| `in-memoria.db` | 런타임 지식 베이스 |
-
-## First Files to Read
-
-새 기여자가 가장 먼저 봐야 하는 파일과 그 이유는 다음과 같습니다.
-
-| 파일 | 왜 먼저 읽어야 하는가 |
-| --- | --- |
-| `src/autonomous/driver/competition_driver.py` | 전체 노드 오케스트레이션 진입점 |
-| `src/autonomous/modules/perception/cone_detector.py` | 인식 파이프라인의 핵심 |
-| `src/autonomous/modules/control/pure_pursuit.py` | 경로 추종 알고리즘 |
-| `src/autonomous/config/params.yaml` | 튜닝 가능한 모든 파라미터 |
-| `submission/launch/competition.launch` | 제출 시 토픽·노드 매핑 |
-| `docs/SUBMISSION_GUIDE.md` | 대회 제출 절차 |
-
-## Architecture
-
-| 레이어 | 모듈 | 책임 |
+| 모드 | 경로 | 용도 |
 | --- | --- | --- |
-| 입력 | FSDS / 차량 센서 | 카메라·LiDAR 토픽 |
-| 인식 | `perception/cone_detector.py` | 콘 후보 검출 |
-| 인식 | `perception/cone_classifier.py` | 색상 분류 |
-| 인식 | `perception/slam.py` | 트랙 지도 작성 |
-| 계획·제어 | `control/pure_pursuit.py` | 조향 각도 산출 |
-| 계획·제어 | `control/speed.py` | 목표 속도 산출 |
-| 통신 | `v2x/rsu.py` | 외부 인프라 메시지 |
-| 운영 | `utils/lap_timer.py` | 랩 카운트·시간 |
-| 운영 | `utils/watchdog.py` | 이상 정지·복구 |
-| 오케스트레이션 | `driver/competition_driver.py` | 노드 전체 조율 |
+| `autonomous` | `src/autonomous/` | 로컬 개발, 시뮬레이터 연동, 영상 기록 |
+| `submission` | `src/submission/` | 대회 제출용 패키지, 실제 차량/하드웨어 연동 |
 
-두 런타임의 진입점은 다음과 같이 구분됩니다.
+## 패키지 구성
 
-| 모드 | 위치 | 진입점 |
+```
+./
+├── README.md
+├── LICENSE
+├── OWNERS
+├── CONTRIBUTING.md
+├── AGENTS.md
+├── in-memoria.db            # 로컬 개발용 SQLite 캐시
+├── src/
+│   ├── autonomous/          # 개발 모드 스택 (Docker, ROS launch, 모듈)
+│   │   ├── Dockerfile
+│   │   ├── docker-compose.yml
+│   │   ├── entrypoint.sh
+│   │   ├── start.sh
+│   │   ├── run_all.sh
+│   │   ├── record_race.sh
+│   │   ├── scripts/start_race.py
+│   │   ├── config/
+│   │   │   ├── bridge_no_camera.launch
+│   │   │   └── params.yaml
+│   │   ├── driver/competition_driver.py
+│   │   ├── modules/perception/{cone_detector,cone_classifier,slam}.py
+│   │   ├── modules/control/{pure_pursuit,speed}.py
+│   │   ├── modules/utils/{lap_timer,watchdog}.py
+│   │   └── tests/test_algorithms.py
+│   ├── submission/          # 대회 제출 패키지
+│   │   ├── Dockerfile
+│   │   ├── docker-compose.yml
+│   │   ├── dev.sh
+│   │   ├── run.sh
+│   │   ├── launch/competition.launch
+│   │   ├── src/drivers/{basic,advanced,autonomous,competition}.py
+│   │   ├── src/perception/{cone_detector,cone_classifier,slam}.py
+│   │   ├── src/v2x/rsu.py
+│   │   ├── src/control/{pure_pursuit,speed}.py
+│   │   ├── src/utils/{lap_timer,watchdog}.py
+│   │   └── autonomous/      # 제출 내부 자율주행 컨테이너
+│   └── simulator/           # FSDS 시뮬레이터 설정
+│       ├── README.md
+│       └── settings.json
+├── scripts/package.sh       # 대회 제출 아카이브 생성기
+├── docs/
+│   ├── SUBMISSION_GUIDE.md
+│   └── reference_materials/ # FSDS 설치·SLAM·V2X 강의 자료
+└── submission/              # 루트의 제출 디렉토리(문서/스크립트 보조)
+    ├── AGENTS.md
+    ├── README.md
+    └── Dockerfile
+```
+
+## 상태 및 지원 범위
+
+| 영역 | 상태 | 비고 |
 | --- | --- | --- |
-| 개발/시뮬레이션 | `src/autonomous/` | `run_all.sh`, `start.sh` |
-| 대회 제출 | `submission/` | `run.sh`, `launch/competition.launch` |
+| 시뮬레이션 자율주행 | 안정 | FSDS 연동 검증됨 |
+| 대회 제출 패키지 | 안정 | `docs/SUBMISSION_GUIDE.md` 절차 사용 |
+| V2X (RSU) | 실험적 | `src/submission/src/v2x/rsu.py` 참조 |
+| 카메라 없는 브리지 모드 | 안정 | `bridge_no_camera.launch` |
+| 단위 테스트 | 부분 | `src/autonomous/tests/test_algorithms.py` |
 
-## Quick Start
+이 저장소는 **deprecated가 아니며**, FSD 대회 시즌에 맞춰 운영되는 competition-ready 코드다. 단, V2X 노드는 실차/하드웨어 의존성이 있어 시뮬레이션에서는 동작이 제한될 수 있다.
+
+## 먼저 읽을 파일
+
+| 순서 | 파일 | 이유 |
+| --- | --- | --- |
+| 1 | `docs/SUBMISSION_GUIDE.md` | 대회 제출 절차 요약 |
+| 2 | `src/autonomous/config/params.yaml` | 모든 노드의 튜닝 파라미터 |
+| 3 | `src/autonomous/driver/competition_driver.py` | 파이프라인 오케스트레이터 |
+| 4 | `src/autonomous/modules/perception/cone_detector.py` | 콘 검출 진입점 |
+| 5 | `src/submission/launch/competition.launch` | 제출 모드의 ROS 노드 구성 |
+| 6 | `src/simulator/README.md` | FSDS 설정 방법 |
+| 7 | `scripts/package.sh` | 제출 아카이브 생성 방법 |
+
+## 진입점 (Entry Points)
+
+| 진입점 | 종류 | 설명 |
+| --- | --- | --- |
+| `src/autonomous/driver/competition_driver.py` | Python | 자율주행 메인 루프 (perception → control) |
+| `src/submission/src/drivers/competition.py` | Python | 제출 모드용 드라이버 |
+| `src/submission/src/drivers/advanced.py` | Python | 확장 드라이버 (대회 고급 카테고리) |
+| `src/submission/src/drivers/autonomous.py` | Python | 자율주행 드라이버 래퍼 |
+| `src/submission/src/drivers/basic.py` | Python | 베이스라인 드라이버 |
+| `src/submission/launch/competition.launch` | ROS launch | 제출 노드 그래프 기동 |
+| `src/autonomous/config/bridge_no_camera.launch` | ROS launch | 카메라 입력 없이 SLAM/제어만 검증 |
+| `scripts/package.sh` | Shell | 제출 아카이브 패키징 |
+
+## 아키텍처
+
+| 계층 | 모듈 | 책임 |
+| --- | --- | --- |
+| 입력 | FSDS 시뮬레이터 / 카메라 토픽 | 차량 상태, 이미지, LiDAR |
+| Perception | `cone_detector`, `cone_classifier`, `slam` | 콘 위치 추정, 트랙 경계 인식, 자기 위치 추정 |
+| V2X | `v2x/rsu` | RSU(노변 기지국) 메시지 송수신 |
+| Planning/Control | `pure_pursuit`, `speed` | 경로 추종 및 속도 명령 생성 |
+| Driver | `competition_driver`, `drivers/*` | 위 모듈들을 묶어 차량 명령 발행 |
+| Utility | `lap_timer`, `watchdog` | 랩 기록, 장애 감시 |
+| Runtime | Docker + docker-compose | 재현 가능한 실행 환경 제공 |
+
+요청 흐름:
+
+1. FSDS가 `/cam`, `/odom` 등 ROS 토픽을 발행한다.
+2. `cone_detector`가 이미지에서 콘 후보를 추출하고 `cone_classifier`가 색상(파랑/노랑/주황)을 판별한다.
+3. `slam`이 LiDAR/관성 정보를 결합해 차량의 트랙상 위치를 갱신한다.
+4. `pure_pursuit`이 콘 중심 경로를 따라 조향각을 계산하고 `speed`가 직선/곡률을 고려해 속도를 결정한다.
+5. `lap_timer`가 시작선 통과를 감지해 랩 타임을 기록하고, `watchdog`가 일정 시간 입력이 없으면 안전 정지한다.
+6. `competition_driver`가 위 결과를 묶어 `/cmd_vel` 또는 차량 제어 토픽으로 송출한다.
+
+## 빠른 시작
 
 ### 사전 요구사항
 
-- Docker 24+ / docker-compose v2
-- ROS2 Humble (컨테이너 외부 디버깅 시)
-- FSDS 시뮬레이터 (로컬 구동 시)
+- Docker 20.10 이상, docker-compose v2
+- FSDS 설치 (자세한 절차: `docs/reference_materials/lecture1_fsds_install.txt`)
+- NVIDIA GPU 권장 (시뮬레이터 가속용)
 
-### 개발 모드(시뮬레이터)
+### 1) 저장소 클론 후 시뮬레이터 실행
 
-```bash
-docker compose -f src/autonomous/docker-compose.yml up --build
-docker compose -f src/autonomous/docker-compose.yml exec autonomous bash
-./src/autonomous/run_all.sh
-```
+FSDS를 설치한 뒤 `src/simulator/settings.json`을 시뮬레이터 디렉토리에 둔다.
 
-### 대회 제출 모드
+### 2) 자율주행(개발) 모드 실행
 
 ```bash
-docker compose -f submission/docker-compose.yml up --build
-./submission/run.sh
+cd src/autonomous
+docker-compose up --build
 ```
 
-### 시뮬레이터 단독 실행
+내부적으로 `entrypoint.sh` → `start.sh` 또는 `run_all.sh` 순으로 기동되며, `bridge_no_camera.launch`로 ROS 노드가 로드된다. 영상을 남기려면 별도로 `record_race.sh`를 사용한다.
+
+### 3) 대회 제출 모드 실행
 
 ```bash
-# FSDS는 src/simulator/settings.json을 읽어 트랙·차량을 구성
-./src/autonomous/record_race.sh   # rosbag 녹화 예시
+cd src/submission
+./run.sh           # 대회 운영 시
+./dev.sh           # 로컬 디버깅 시
+docker-compose up  # 직접 컨테이너를 띄울 때
 ```
 
-## Configuration
+### 4) 제출용 아카이브 생성
 
-| 파일 | 용도 |
-| --- | --- |
-| `src/autonomous/config/params.yaml` | 개발 런타임 파라미터 |
-| `submission/autonomous/config/params.yaml` | 제출 런타임 파라미터 |
-| `submission/launch/competition.launch` | ROS2 노드·토픽 매핑 |
-| `src/autonomous/config/bridge_no_camera.launch` | 카메라 제외 브릿지 런처 |
-| `src/simulator/settings.json` | FSDS 트랙·차량 설정 |
+```bash
+bash scripts/package.sh
+```
 
-자주 조정하는 키 예시:
+생성된 아카이브는 대회 플랫폼이 요구하는 형식으로 묶인다. 자세한 내용은 `docs/SUBMISSION_GUIDE.md`를 따른다.
 
-| 키 | 설명 | 단위 |
+## 명령어 참조
+
+| 명령어 | 위치 | 설명 |
 | --- | --- | --- |
-| `max_speed` | 직선 목표 속도 | m/s |
-| `lookahead` | Pure Pursuit 전방주시 거리 | m |
-| `cone_color_thresholds` | 콘 색상 분류 임계값 | HSV |
-| `watchdog_timeout` | 워치독 비활성 타임아웃 | s |
+| `docker-compose up --build` | `src/autonomous/` | 개발 컨테이너 빌드 및 기동 |
+| `bash start.sh` | `src/autonomous/` | 컨테이너 내부에서 ROS 노드만 기동 |
+| `bash run_all.sh` | `src/autonomous/` | 시뮬레이터 + ROS 노드 일괄 기동 |
+| `bash record_race.sh` | `src/autonomous/` | 주행 영상을 rosbag으로 기록 |
+| `python3 scripts/start_race.py` | `src/autonomous/scripts/` | 레이스 시작 훅 |
+| `roslaunch competition.launch` | `src/submission/launch/` | 제출 노드 그래프 기동 |
+| `./run.sh` | `src/submission/` | 대회 운영 스크립트 |
+| `./dev.sh` | `src/submission/` | 로컬 개발 스크립트 |
+| `bash scripts/package.sh` | 저장소 루트 | 제출 아카이브 패키징 |
 
-## Entry Points & Commands
+## 구성 (Configuration)
 
-| 명령 | 위치 | 설명 |
+주요 설정은 `src/autonomous/config/params.yaml`에 있다. 시뮬레이터 토픽 이름, 콘 색상 임계값, Pure Pursuit lookahead 거리, 속도 리미트, watchdog 타임아웃 등을 조정한다. `bridge_no_camera.launch`는 카메라 토픽을 더미로 대체해 비전 비의존 경로로 SLAM/제어만 빠르게 검증할 때 사용한다.
+
+| 파라미터 그룹 | 예시 키 | 기본 위치 |
 | --- | --- | --- |
-| `docker compose up --build` | `src/autonomous/`, `submission/` | 런타임 빌드·기동 |
-| `./submission/run.sh` | `submission/` | 제출 런타임 실행 |
-| `./src/autonomous/run_all.sh` | `src/autonomous/` | 개발 런타임 전체 실행 |
-| `./src/autonomous/start.sh` | `src/autonomous/` | 단일 노드 기동 |
-| `./src/autonomous/record_race.sh` | `src/autonomous/` | 레이스 rosbag 녹화 |
-| `./scripts/package.sh` | `scripts/` | 제출물 tar/zip 패키징 |
-| `python3 src/autonomous/tests/test_algorithms.py` | `src/autonomous/tests/` | 알고리즘 단위 테스트 |
-| `bash submission/dev.sh` | `submission/` | 제출 패키지 개발 셸 |
+| Perception | 콘 HSV 임계값, ROI 비율 | `params.yaml` |
+| Control | lookahead 거리, 최대 조향각 | `params.yaml` |
+| Speed | 직선/곡선 속도, 감속 비율 | `params.yaml` |
+| Lap Timer | 시작선 좌표, 최소 통과 시간 | `params.yaml` |
+| Watchdog | 입력 타임아웃, 안전 정지 속도 | `params.yaml` |
 
-## Local Development
+## 로컬 개발
 
-1. `src/autonomous/modules/`에서 알고리즘 수정
-2. `src/autonomous/tests/`에서 단위 검증
-3. `docker compose -f src/autonomous/docker-compose.yml build`로 이미지 갱신
-4. FSDS와 함께 end-to-end 실행 후 동작 확인
-5. 안정화된 로직을 `submission/src/`에 동일하게 동기화
-6. `scripts/package.sh`로 제출물 패키징 후 `docs/SUBMISSION_GUIDE.md` 절차 적용
+| 단계 | 방법 |
+| --- | --- |
+| 컨테이너 진입 | `docker-compose exec autonomous bash` |
+| 단일 노드 실행 | `rosrun <pkg> <node>` (예: `rosrun perception cone_detector.py`) |
+| 파라미터 덮어쓰기 | `roslaunch --args _param:=value competition.launch` |
+| 시뮬레이터 설정 변경 | `src/simulator/settings.json` 수정 후 재기동 |
+| 캐시 초기화 | `in-memoria.db` 삭제 (SQLite 캐시) |
 
-## Testing
+## 테스트
 
-| 항목 | 경로 | 내용 |
+| 테스트 종류 | 위치 | 실행 |
 | --- | --- | --- |
-| 알고리즘 단위 테스트 | `src/autonomous/tests/test_algorithms.py` | Pure Pursuit·속도 곡선 |
-| 레이스 녹화 검증 | `src/autonomous/record_race.sh` | rosbag 비교 |
-| 제출 dry-run | `submission/run.sh` | 컨테이너 내부 dry-run |
+| 알고리즘 단위 테스트 | `src/autonomous/tests/test_algorithms.py` | `python3 -m unittest src/autonomous/tests/test_algorithms.py` |
+| 카메라 없는 통합 테스트 | `bridge_no_camera.launch` 사용 | `roslaunch bridge_no_camera.launch` |
+| 시뮬레이션 E2E | FSDS + `run_all.sh` | `bash src/autonomous/run_all.sh` |
+| 제출 드라이버 스모크 | `src/submission/src/drivers/basic.py` | `rosrun drivers basic.py` |
 
-## Contribution Guide
+## 기여 가이드
 
-1. 작업 항목(한국어/영어 무관)을 이슈로 먼저 등록
-2. 기능 브랜치 생성 후 `src/autonomous/tests/` 통과 확인
-3. `submission/src/` 측 동일 코드 경로에 동기화
-4. `CONTRIBUTING.md`의 코드 스타일·커밋 컨벤션 준수
-5. PR 제출 후 `OWNERS`의 리뷰 대기
+1. 이슈를 먼저 등록하고 작업 범위를 합의한다.
+2. `main`에서 기능 브랜치를 분기한다 (예: `feat/cone-color-tuning`).
+3. 단위 테스트를 추가하거나 기존 테스트를 갱신한다.
+4. PR 본문에 시뮬레이션 결과(랩 타임, 콘 인식률)를 첨부한다.
+5. `OWNERS` 파일의 리뷰어 중 최소 1인의 승인을 받아 병합한다.
 
-## Maintainers & Contact
+자세한 규칙은 저장소 루트의 `CONTRIBUTING.md`를 따른다.
 
-| 항목 | 위치 |
+## 유지보수자 및 연락처
+
+| 역할 | 위치 |
 | --- | --- |
-| 메인테이너 목록 | [`OWNERS`](OWNERS) |
-| 기여 절차 | [`CONTRIBUTING.md`](CONTRIBUTING.md) |
-| 대회 제출 절차 | [`docs/SUBMISSION_GUIDE.md`](docs/SUBMISSION_GUIDE.md) |
+| 메인테이너 목록 | `OWNERS` |
+| 대회 운영 이슈 | `docs/SUBMISSION_GUIDE.md` 참조 후 이슈 등록 |
+| FSDS 설치/환경 문제 | `docs/reference_materials/lecture1_fsds_install.txt` |
 
-## License & Further Docs
+## 추가 문서
 
-| 항목 | 링크 |
+| 문서 | 위치 |
 | --- | --- |
-| 라이선스 | [`LICENSE`](LICENSE) |
-| 시뮬레이터 안내 | [`src/simulator/README.md`](src/simulator/README.md) |
-| 제출 런타임 안내 | [`submission/README.md`](submission/README.md) |
-| FSDS 설치 참고 | [`docs/reference_materials/lecture1_fsds_install.txt`](docs/reference_materials/lecture1_fsds_install.txt) |
-| SLAM 참고 | [`docs/reference_materials/lecture4_slam.ipynb`](docs/reference_materials/lecture4_slam.ipynb) |
-| V2X 참고 | [`docs/reference_materials/lecture6_v2x.ipynb`](docs/reference_materials/lecture6_v2x.ipynb) |
+| 대회 제출 가이드 | `docs/SUBMISSION_GUIDE.md` |
+| FSDS 설치 가이드 | `docs/reference_materials/lecture1_fsds_install.txt` |
+| SLAM 강의 노트북 | `docs/reference_materials/lecture4_slam.ipynb` |
+| V2X 강의 노트북 | `docs/reference_materials/lecture6_v2x.ipynb` |
+| 시뮬레이터 설정 메모 | `src/simulator/README.md` |
+| 제출 패키지 메모 | `submission/README.md` |
+| 자율 모드 노트 | `src/autonomous/AGENTS.md` |
+| 제출 모드 노트 | `submission/AGENTS.md` |
+| 에이전트 운영 규약 | `AGENTS.md` |
+
+## 라이선스
+
+`LICENSE` 파일의 조항을 따른다. 대회 제출 시 외부 라이브러리 고지 의무가 있으면 `docs/SUBMISSION_GUIDE.md`를 함께 확인할 것.
